@@ -1,0 +1,21 @@
+{
+  "name": "superpixel",
+  "version": "0.1.0",
+  "description": "implement superpixel with JS",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ysjk2003/superpixel.git"
+  },
+  "keywords": [
+    "superpixel",
+    "segmentation"
+  ],
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/ysjk2003/superpixel/issues"
+  },
+  "homepage": "https://github.com/ysjk2003/superpixel#readme"
+}
