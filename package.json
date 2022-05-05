@@ -17,5 +17,13 @@
   "bugs": {
     "url": "https://github.com/ysjk2003/superpixel/issues"
   },
-  "homepage": "https://github.com/ysjk2003/superpixel#readme"
+  "homepage": "https://github.com/ysjk2003/superpixel#readme",
+  "devDependencies": {
+    "eslint": "^8.0.1",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.6.2"
+  },
+  "dependencies": {}
 }
