@@ -7,56 +7,58 @@
  *
  * Copyright 2015  Kota Yamaguchi
  */
-define(["./util"],
-function (util) {
-  function Pagination(count, params) {
-    var i, anchor,
-        page = parseInt(params.page || 0, 10),
-        perPage = parseInt(params.per_page || 30, 10),
-        neighbors = parseInt(params.page_neighbors || 2, 10),
-        pages = Math.ceil(count / perPage),
-        startIndex = Math.min(Math.max(page * perPage, 0), count),
-        endIndex = Math.min(Math.max((page + 1) * perPage, 0), count);
-    this.begin = function () { return startIndex; };
-    this.end = function () { return endIndex; };
-    this.render = function (options) {
-      options = options || {};
-      var index = [];
-      for (i = 0; i < pages; ++i) {
-        if (i <=  ((page <= neighbors) ? 2 : 1) * neighbors ||
-            (page - neighbors <= i && i <= page + neighbors) ||
-            pages - ((page >= pages - neighbors - 1) ? 2 : 1) * neighbors <= i)
-          index.push(i);
-      }
-      var container = document.createElement(options.nodeType || "p");
-      {
-        anchor = document.createElement("a");
-        if (page > 0)
-          anchor.href = util.makeQueryParams(params, { page: page - 1 });
-        anchor.appendChild(document.createTextNode("Prev"));
-        container.appendChild(anchor);
-        container.appendChild(document.createTextNode(" "));
-      }
-      for (i = 0; i < index.length; ++i) {
-        anchor = document.createElement("a");
-        if (index[i] !== page)
-          anchor.href = util.makeQueryParams(params, { page: index[i] });
-        anchor.appendChild(document.createTextNode(index[i]));
-        container.appendChild(anchor);
-        container.appendChild(document.createTextNode(" "));
-        if (i < index.length - 1 && index[i] + 1 != index[i+1])
-          container.appendChild(document.createTextNode("... "));
-      }
-      {
-        anchor = document.createElement("a");
-        if (page < pages - 1)
-          anchor.href = util.makeQueryParams(params, { page: page + 1 });
-        anchor.appendChild(document.createTextNode("Next"));
-        container.appendChild(anchor);
-      }
-      return container;
-    };
+import { makeQueryParams } from "./util"
+
+export default class Pagination {
+  constructor(count, params) {
+    this.anchor = undefined
+    this.page = parseInt(params.page || 0, 10)
+    this.perPage = parseInt(params.per_page || 30, 10)
+    this.neighbors = parseInt(params.page_neighbors || 2, 10)
+    this.pages = Math.ceil(count / this.perPage)
+    this.startIndex = Math.min(Math.max(this.page * this.perPage, 0), count)
+    this.endIndex = Math.min(Math.max((this.page + 1) * this.perPage, 0), count)
   }
 
-  return Pagination;
-});
+  begin() {
+    return this.startIndex
+  }
+  end() {
+    return this.endIndex
+  }
+  render(options) {
+    options = options || {}
+    const index = []
+    for (let i = 0; i < this.pages; ++i) {
+      if (
+        i <= (this.page <= this.neighbors ? 2 : 1) * this.neighbors ||
+        (this.page - this.neighbors <= i && i <= this.page + this.neighbors) ||
+        this.pages - (this.page >= this.pages - this.neighbors - 1 ? 2 : 1) * this.neighbors <= i
+      )
+        index.push(i)
+    }
+    const container = document.createElement(options.nodeType || "p")
+    {
+      this.anchor = document.createElement("a")
+      if (this.page > 0) this.anchor.href = makeQueryParams(this.params, { page: this.page - 1 })
+      this.anchor.appendChild(document.createTextNode("Prev"))
+      container.appendChild(this.anchor)
+      container.appendChild(document.createTextNode(" "))
+    }
+    for (let i = 0; i < index.length; ++i) {
+      this.anchor = document.createElement("a")
+      if (index[i] !== this.page) this.anchor.href = makeQueryParams(this.params, { page: index[i] })
+      this.anchor.appendChild(document.createTextNode(index[i]))
+      container.appendChild(this.anchor)
+      container.appendChild(document.createTextNode(" "))
+      if (i < index.length - 1 && index[i] + 1 != index[i + 1]) container.appendChild(document.createTextNode("... "))
+    }
+    {
+      this.anchor = document.createElement("a")
+      if (this.page < this.pages - 1) this.anchor.href = makeQueryParams(this.params, { page: this.page + 1 })
+      this.anchor.appendChild(document.createTextNode("Next"))
+      container.appendChild(this.anchor)
+    }
+    return container
+  }
+}

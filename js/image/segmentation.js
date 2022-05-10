@@ -8,25 +8,24 @@
  *
  * Copyright 2015  Kota Yamaguchi
  */
-define(["./segmentation/pff",
-        "./segmentation/slic",
-        "./segmentation/slico",
-        "./segmentation/watershed"],
-function (pff, slic, slico, watershed) {
-  var methods = {
-    pff: pff,
-    slic: slic,
-    slico: slico,
-    watershed: watershed
-  };
+import PFF from "./segmentation/pff"
+import SLIC from "./segmentation/slic"
+import SLICO from "./segmentation/slico"
+import WatershedSegmentation from "./segmentation/watershed"
 
-  methods.create = function (imageData, options) {
-    options = options || {};
-    options.method = options.method || "slic";
-    if (!methods[options.method])
-      throw "Invalid method: " + options.method;
-    return new methods[options.method](imageData, options);
-  };
-
-  return methods;
-});
+export function createSegment(imageData, options) {
+  options = options || {}
+  options.method = options.method || "slic"
+  switch (options.method) {
+    case "slic":
+      return new SLIC(imageData, options)
+    case "pff":
+      return new PFF(imageData, options)
+    case "slico":
+      return new SLICO(imageData, options)
+    case "watershed":
+      return new WatershedSegmentation(imageData, options)
+    default:
+      throw "Invalid method: " + options.method
+  }
+}
