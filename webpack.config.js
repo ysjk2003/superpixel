@@ -1,9 +1,13 @@
 const path = require("path")
 
+const HtmlWebpackPlugin = require("html-webpack-plugin")
+
+const mode = process.env.NODE_ENV || "development"
+
 module.exports = {
-  mode: "development",
+  mode: mode,
   entry: {
-    main: "./js/main.js",
+    main: "./src/js/main.js",
   },
   output: {
     filename: "[name].js",
@@ -31,8 +35,28 @@ module.exports = {
     ],
   },
   devServer: {
-    static: {
-      directory: __dirname,
+    port: 3001,
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+      },
     },
+    hot: true,
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: "./public/index.html",
+      minify:
+        mode === "production"
+          ? {
+              collapseWhitespace: true,
+              removeComments: true,
+            }
+          : false,
+    }),
+  ],
+  resolve: {
+    extensions: [".tsx", ".ts", ".js"],
   },
 }
