@@ -7,7 +7,7 @@ const mode = process.env.NODE_ENV || "development"
 module.exports = {
   mode: mode,
   entry: {
-    main: "./src/js/main.js",
+    main: "./src/main.ts",
   },
   output: {
     filename: "[name].js",
