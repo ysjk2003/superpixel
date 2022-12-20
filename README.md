@@ -10,6 +10,25 @@ A browser must support HTML canvas to use this tool.
 
 There is an [online demo](http://kyamagu.github.io/js-segment-annotator/?view=index).
 
+## How to use
+```
+npm install superpixel
+```
+```js
+import SLIC from "superpixel/src/image/segmentation/slic"
+
+const imageData = new ImageData() //Image data for which you want to know the result value of superpixel
+const slic = new SLIC(imageData)
+
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d") as CanvasRenderingContext2D
+ctx.putImageData(slic.result, 0, 0)
+ctx.imageSmoothingEnabled = true
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+const data = this.computeEdgeMap(imageData)
+ctx.putImageData(new ImageData(data, this.canvas.width, this.canvas.height), 0, 0)
+```
+
 ## Known issues
 
 _Browser incompatibility_
