@@ -3,18 +3,16 @@
 import Pagination from "../helper/pagination"
 import Viewer from "../helper/segment-viewer"
 import * as util from "../helper/util"
+import { Params, Data } from "../main"
 
-function createLabelOptions(params, labels) {
-  var container = document.createElement("p"),
-    select = document.createElement("select"),
-    option
-  {
-    option = document.createElement("option")
-    option.appendChild(document.createTextNode("all"))
-    select.appendChild(option)
-  }
-  for (var i = 0; i < labels.length; ++i) {
-    option = document.createElement("option")
+function createLabelOptions(params: Params, labels: string[]) {
+  const container = document.createElement("p")
+  const select = document.createElement("select")
+  const option = document.createElement("option")
+  option.appendChild(document.createTextNode("all"))
+  select.appendChild(option)
+  for (let i = 0; i < labels.length; ++i) {
+    const option = document.createElement("option")
     option.appendChild(document.createTextNode(labels[i]))
     if (labels[i] === params.label) {
       option.selected = true
@@ -22,20 +20,20 @@ function createLabelOptions(params, labels) {
     select.appendChild(option)
   }
   select.onchange = function (event) {
-    window.location = util.makeQueryParams(params, {
-      label: event.target.value === "all" ? null : event.target.value,
+    window.location.href = util.makeQueryParams(params, {
+      label: event.target instanceof HTMLSelectElement && event.target.value !== "all" ? event.target.value : null,
     })
   }
   container.appendChild(select)
   return container
 }
 
-export function render(data, params) {
-  var pagination = new Pagination(data.imageURLs.length, params)
+export function render(data: Data, params: Params) {
+  const pagination = new Pagination(data.imageURLs.length, params)
   document.body.appendChild(pagination.render())
   document.body.appendChild(createLabelOptions(params, data.labels))
-  for (var i = pagination.begin(); i < pagination.end(); ++i) {
-    var viewer = new Viewer(data.imageURLs[i], data.annotationURLs[i], {
+  for (let i = pagination.begin(); i < pagination.end(); ++i) {
+    const viewer = new Viewer(data.imageURLs[i], data.annotationURLs[i], {
         width: params.width || 240,
         height: params.height || 320,
         colormap: data.colormap,

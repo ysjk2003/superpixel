@@ -6,8 +6,13 @@ import Colormap from "./helper/colormap"
 import * as util from "./helper/util"
 
 type Color = [number, number, number]
-type Params = { label: string; view: string }
-type Data = { colormap: Color[]; annotatorURLs: string[]; imageURLs: string[]; labels: string[] }
+export type Params = { label: string; view: string; width: number; height: number }
+export type Data = {
+  colormap: Color[]
+  annotationURLs: string[]
+  imageURLs: string[]
+  labels: string[]
+}
 type Renderer = (data: Data, params: Params) => void
 
 const dataURL = "./data/example.json" // Change this to another dataset.
