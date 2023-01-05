@@ -3,12 +3,13 @@
 import Annotator from "../helper/segment-annotator"
 import { makeQueryParams } from "../helper/util"
 import Layer from "../image/layer"
+import { Data, Params } from "../main"
 
 // Create the navigation menu.
-function createNavigationMenu(params, data, annotator) {
-  var navigationMenu = document.createElement("p"),
-    navigation = createNavigation(params, data),
-    idBlock = document.createElement("div")
+function createNavigationMenu(params: Params, data: Data) {
+  const navigationMenu = document.createElement("p")
+  const navigation = createNavigation(params, data)
+  const idBlock = document.createElement("div")
   idBlock.className = "edit-top-menu-block"
   idBlock.appendChild(document.createTextNode(" ID = " + params.id))
   navigationMenu.appendChild(navigation)
@@ -17,15 +18,14 @@ function createNavigationMenu(params, data, annotator) {
 }
 
 // Create the page navigation.
-function createNavigation(params, data) {
-  var id = parseInt(params.id, 10),
+function createNavigation(params: Params, data: Data) {
+  const id = parseInt(params.id, 10),
     container = document.createElement("div"),
     indexAnchor = document.createElement("a"),
     indexAnchorText = document.createTextNode("Index"),
     prevAnchorText = document.createTextNode("Prev"),
-    nextAnchorText = document.createTextNode("Next"),
-    prevAnchor,
-    nextAnchor
+    nextAnchorText = document.createTextNode("Next")
+  let prevAnchor, nextAnchor
   indexAnchor.href = makeQueryParams({ view: "index" })
   indexAnchor.appendChild(indexAnchorText)
   if (id > 0) {
@@ -52,8 +52,8 @@ function createNavigation(params, data) {
 }
 
 // Create the main content block.
-function createMainDisplay(params, data, annotator, imageLayer) {
-  var container = document.createElement("div"),
+function createMainDisplay(params: Params, data: Data, annotator: Annotator, imageLayer: Layer) {
+  const container = document.createElement("div"),
     imageContainerSpacer = document.createElement("div"),
     imageContainer = document.createElement("div"),
     annotatorTopMenu = createImageTopMenu(params, data, annotator),
@@ -80,8 +80,8 @@ function createMainDisplay(params, data, annotator, imageLayer) {
 }
 
 // Create the menu above the editor.
-function createImageTopMenu(params, data, annotator) {
-  var container = document.createElement("div"),
+function createImageTopMenu(params: Params, data: Data, annotator: Annotator) {
+  const container = document.createElement("div"),
     zoomOutButton = document.createElement("div"),
     zoomInButton = document.createElement("div"),
     spacer1 = document.createElement("span"),
@@ -158,9 +158,9 @@ function createImageTopMenu(params, data, annotator) {
 }
 
 // Set up the automatic flash of boundary.
-var boundaryFlashTimeoutID = null
+let boundaryFlashTimeoutID: number = null
 function boundaryFlash() {
-  var boundaryButton = document.getElementById("boundary-button")
+  const boundaryButton = document.getElementById("boundary-button")
   if (boundaryFlashTimeoutID) {
     window.clearTimeout(boundaryFlashTimeoutID)
     boundaryFlashTimeoutID = window.setTimeout(function () {
@@ -177,8 +177,8 @@ function boundaryFlash() {
 }
 
 // Create the sidebar.
-function createSidebar(params, data, annotator) {
-  var container = document.createElement("div"),
+function createSidebar(params: Params, data: Data, annotator: Annotator) {
+  const container = document.createElement("div"),
     labelPicker = createLabelPicker(params, data, annotator),
     spacer1 = document.createElement("div"),
     undoButton = document.createElement("div"),
@@ -189,18 +189,16 @@ function createSidebar(params, data, annotator) {
     superpixelToolButton = document.createElement("div"),
     spacer4 = document.createElement("div"),
     polygonToolButton = document.createElement("div"),
-    spacer5 = document.createElement("div"),
     brushToolButton = document.createElement("div"),
-    spacer6 = document.createElement("div"),
     manualParagraph = document.createElement("p"),
-    spacer7 = document.createElement("div"),
-    exportButton = document.createElement("input"),
-    manualText
+    exportButton = document.createElement("input")
   exportButton.type = "submit"
   exportButton.value = "export"
   exportButton.className = "edit-sidebar-submit"
   exportButton.addEventListener("click", function () {
-    var filename = data.annotationURLs ? data.annotationURLs[params.id].split(/[\\/]/).pop() : params.id + ".png"
+    const filename = data.annotationURLs
+      ? data.annotationURLs[parseInt(params.id, 10)].split(/[\\/]/).pop()
+      : params.id + ".png"
     downloadURI(annotator.export(), filename)
   })
   spacer1.className = "edit-sidebar-spacer"
@@ -283,8 +281,8 @@ function createSidebar(params, data, annotator) {
   return container
 }
 
-function createLabelButton(data, value, index, annotator) {
-  var colorBox = document.createElement("span"),
+function createLabelButton(data: Data, value: string, index: number, annotator: Annotator) {
+  const colorBox = document.createElement("span"),
     labelText = document.createElement("span"),
     pickButton = document.createElement("div"),
     popupButton = document.createElement("div"),
@@ -310,10 +308,10 @@ function createLabelButton(data, value, index, annotator) {
   pickButton.id = "label-" + index + "-button"
   pickButton.className = "edit-sidebar-button"
   pickButton.addEventListener("click", function () {
-    var className = "edit-sidebar-button-selected"
+    const className = "edit-sidebar-button-selected"
     annotator.currentLabel = index
-    var selectedElements = document.getElementsByClassName(className)
-    for (var i = 0; i < selectedElements.length; ++i) selectedElements[i].classList.remove(className)
+    const selectedElements = document.getElementsByClassName(className)
+    for (let i = 0; i < selectedElements.length; ++i) selectedElements[i].classList.remove(className)
     pickButton.classList.add(className)
   })
   pickButton.addEventListener("mouseenter", function () {
@@ -326,20 +324,20 @@ function createLabelButton(data, value, index, annotator) {
 }
 
 // Hightlight legend labels.
-function highlightLabel(label) {
-  var highlightClass = "edit-sidebar-button-highlight",
+function highlightLabel(label: string) {
+  const highlightClass = "edit-sidebar-button-highlight",
     elements = document.getElementsByClassName(highlightClass)
-  for (var i = 0; i < elements.length; ++i) elements[i].classList.remove(highlightClass)
-  var pickButton = document.getElementById("label-" + label + "-button")
+  for (let i = 0; i < elements.length; ++i) elements[i].classList.remove(highlightClass)
+  const pickButton = document.getElementById("label-" + label + "-button")
   if (pickButton) pickButton.classList.add(highlightClass)
 }
 
 // Create the label picker button.
-function createLabelPicker(params, data, annotator) {
-  var container = document.createElement("div")
+function createLabelPicker(params: Params, data: Data, annotator: Annotator) {
+  const container = document.createElement("div")
   container.className = "edit-sidebar-label-picker"
-  for (var i = 0; i < data.labels.length; ++i) {
-    var labelButton = createLabelButton(data, data.labels[i], i, annotator)
+  for (let i = 0; i < data.labels.length; ++i) {
+    const labelButton = createLabelButton(data, data.labels[i], i, annotator)
     if (i === 0) {
       annotator.currentLabel = 0
       labelButton.classList.add("edit-sidebar-button-selected")
@@ -351,38 +349,40 @@ function createLabelPicker(params, data, annotator) {
 }
 
 // Cancel popup.
-function cancelPopup(event) {
-  var isOutsidePopup = true,
+function cancelPopup(event: MouseEvent) {
+  if (!(event.target instanceof Element)) return
+  let isOutsidePopup = true,
     target = event.target
   while (target.parentNode) {
     isOutsidePopup = isOutsidePopup && !target.classList.contains("edit-sidebar-popup")
-    target = target.parentNode
+    target = target.parentNode as Element
   }
   if (isOutsidePopup) {
-    var popups = document.getElementsByClassName("edit-sidebar-popup-active")
-    if (popups.length) for (var i = 0; i < popups.length; ++i) popups[i].classList.remove("edit-sidebar-popup-active")
+    const popups = document.getElementsByClassName("edit-sidebar-popup-active")
+    if (popups.length) for (let i = 0; i < popups.length; ++i) popups[i].classList.remove("edit-sidebar-popup-active")
   }
 }
 
 // Create the relabel selector.
-function createRelabelSelector(data, index, annotator, popupContainer) {
-  var select = document.createElement("select"),
+function createRelabelSelector(data: Data, index: number, annotator: Annotator, popupContainer: HTMLElement) {
+  const select = document.createElement("select"),
     firstOption = document.createElement("option")
   firstOption.appendChild(document.createTextNode("Change to"))
   select.appendChild(firstOption)
-  for (var i = 0; i < data.labels.length; ++i) {
+  for (let i = 0; i < data.labels.length; ++i) {
     if (i !== index) {
-      var option = document.createElement("option")
-      option.value = i
+      const option = document.createElement("option")
+      option.value = i.toString()
       option.appendChild(document.createTextNode(data.labels[i]))
       select.appendChild(option)
     }
   }
   select.addEventListener("change", function (event) {
-    var sourceLabel = index
-    var targetLabel = parseInt(event.target.value, 10)
+    if (!(event.target instanceof HTMLSelectElement)) return
+    const sourceLabel = index
+    const targetLabel = parseInt(event.target.value, 10)
     if (sourceLabel !== targetLabel) {
-      var currentLabel = annotator.currentLabel
+      const currentLabel = annotator.currentLabel
       annotator.currentLabel = targetLabel
       annotator.fill(sourceLabel)
       annotator.currentLabel = currentLabel
@@ -395,8 +395,8 @@ function createRelabelSelector(data, index, annotator, popupContainer) {
 }
 
 // Download trick.
-function downloadURI(uri, filename) {
-  var anchor = document.createElement("a")
+function downloadURI(uri: string, filename: string) {
+  const anchor = document.createElement("a")
   anchor.style.display = "none"
   anchor.target = "_blank" // Safari doesn't work.
   anchor.download = filename
@@ -407,10 +407,10 @@ function downloadURI(uri, filename) {
 }
 
 // Entry point.
-export function render(data, params) {
-  var id = parseInt(params.id, 10)
+export function render(data: Data, params: Params) {
+  const id = parseInt(params.id, 10)
   if (isNaN(id)) throw "Invalid id"
-  var annotator = new Annotator(data.imageURLs[id], {
+  const annotator = new Annotator(data.imageURLs[id], {
       width: params.width,
       height: params.height,
       colormap: data.colormap,
@@ -421,15 +421,14 @@ export function render(data, params) {
         boundaryFlash()
       },
       onchange: function () {
-        var activeLabels = this.getUniqueLabels(),
+        const activeLabels = this.getUniqueLabels(),
           legendClass = "edit-sidebar-legend-label",
           legendActiveClass = "edit-sidebar-legend-label-active",
-          elements = document.getElementsByClassName(legendClass),
-          i
-        for (i = 0; i < elements.length; ++i) elements[i].classList.remove(legendActiveClass)
-        for (i = 0; i < activeLabels.length; ++i) elements[activeLabels[i]].classList.add(legendActiveClass)
+          elements = document.getElementsByClassName(legendClass)
+        for (let i = 0; i < elements.length; ++i) elements[i].classList.remove(legendActiveClass)
+        for (let i = 0; i < activeLabels.length; ++i) elements[activeLabels[i]].classList.add(legendActiveClass)
       },
-      onrightclick: function (label) {
+      onrightclick: function (label: string) {
         document.getElementById("label-" + label + "-button").click()
       },
       onmousemove: highlightLabel,
@@ -438,6 +437,6 @@ export function render(data, params) {
       width: params.width,
       height: params.height,
     })
-  document.body.appendChild(createNavigationMenu(params, data, annotator))
+  document.body.appendChild(createNavigationMenu(params, data))
   document.body.appendChild(createMainDisplay(params, data, annotator, imageLayer))
 }

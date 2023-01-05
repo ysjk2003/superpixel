@@ -6,7 +6,7 @@ import Colormap from "./helper/colormap"
 import * as util from "./helper/util"
 
 type Color = [number, number, number]
-export type Params = { label: string; view: string; width: number; height: number }
+export type Params = { label: string; view: string; width?: number; height?: number; id: string }
 export type Data = {
   colormap: Color[]
   annotationURLs: string[]
