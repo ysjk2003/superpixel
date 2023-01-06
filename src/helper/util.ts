@@ -1,9 +1,11 @@
+import { Params } from "../main"
+
 // Get JSON by AJAX request.
-export function requestJSON(url, callback) {
-  var xmlhttp = new XMLHttpRequest()
+export function requestJSON(url: string, callback: (data: object) => void) {
+  const xmlhttp = new XMLHttpRequest()
   xmlhttp.onreadystatechange = function () {
     if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-      var data = xmlhttp.responseText
+      const data = xmlhttp.responseText
       callback(JSON.parse(data))
     }
   }
@@ -12,9 +14,9 @@ export function requestJSON(url, callback) {
 }
 
 // Parse query params.
-export function getQueryParams(queryString) {
-  var tokens,
-    params = {},
+export function getQueryParams(queryString?: string) {
+  let tokens
+  const params: { [key: string]: string } = {},
     re = /[?&]?([^=]+)=([^&]*)/g
   queryString = queryString || document.location.search
   while ((tokens = re.exec(queryString.split("+").join(" "))))
@@ -23,11 +25,11 @@ export function getQueryParams(queryString) {
 }
 
 // Create a unique array.
-export function unique() {
-  var uniqueArray = []
-  for (var i = 0; i < arguments.length; ++i) {
-    var array = arguments[i]
-    for (var j = 0; j < array.length; ++j) {
+export function unique(...args: string[][]) {
+  const uniqueArray = []
+  for (let i = 0; i < args.length; ++i) {
+    const array = args[i]
+    for (let j = 0; j < array.length; ++j) {
       if (uniqueArray.indexOf(array[j]) < 0) uniqueArray.push(array[j])
     }
   }
@@ -35,13 +37,13 @@ export function unique() {
 }
 
 // Create query params from an object.
-export function makeQueryParams(params, updates) {
+export function makeQueryParams(params?: Params, updates?: Params) {
   params = params || {}
   updates = updates || {}
-  var queryString = "?"
-  var keys = unique(Object.keys(params), Object.keys(updates))
-  for (var i = 0; i < keys.length; ++i) {
-    var value = updates[keys[i]]
+  let queryString = "?"
+  const keys = unique(Object.keys(params), Object.keys(updates))
+  for (let i = 0; i < keys.length; ++i) {
+    let value = updates[keys[i]]
     if (value === null) continue
     else if (typeof value === "undefined") value = params[keys[i]]
     queryString =

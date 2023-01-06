@@ -32,14 +32,14 @@ function createNavigation(params: Params, data: Data) {
     prevAnchor = document.createElement("a")
     prevAnchor.appendChild(prevAnchorText)
     prevAnchor.href = makeQueryParams(params, {
-      id: id - 1,
+      id: (id - 1).toString(),
     })
   } else prevAnchor = prevAnchorText
   if (id < data.imageURLs.length - 1) {
     nextAnchor = document.createElement("a")
     nextAnchor.appendChild(nextAnchorText)
     nextAnchor.href = makeQueryParams(params, {
-      id: id + 1,
+      id: (id + 1).toString(),
     })
   } else nextAnchor = nextAnchorText
   container.appendChild(prevAnchor)

@@ -43,7 +43,7 @@ export function render(data: Data, params: Params) {
       }),
       anchor = document.createElement("a")
     anchor.appendChild(viewer.container)
-    anchor.href = util.makeQueryParams({ view: "edit", id: i })
+    anchor.href = util.makeQueryParams({ view: "edit", id: i.toString() })
     document.body.appendChild(anchor)
   }
 }
