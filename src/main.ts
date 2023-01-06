@@ -6,7 +6,7 @@ import Colormap from "./helper/colormap"
 import * as util from "./helper/util"
 
 type Color = [number, number, number]
-export type Params = { [key: string]: string }
+export type Params = { [key: string]: string | number }
 export type Data = {
   colormap: Color[]
   annotationURLs: string[]
@@ -39,7 +39,7 @@ function createColormap(label: string, labels: string[]) {
 // Load dataset before rendering a view.
 function renderPage(renderer: Renderer) {
   util.requestJSON(dataURL, function (data: Data) {
-    data.colormap = createColormap(params.label, data.labels)
+    data.colormap = createColormap(params.label as string, data.labels)
     renderer(data, params)
   })
 }

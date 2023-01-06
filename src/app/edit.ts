@@ -19,7 +19,7 @@ function createNavigationMenu(params: Params, data: Data) {
 
 // Create the page navigation.
 function createNavigation(params: Params, data: Data) {
-  const id = parseInt(params.id, 10),
+  const id = parseInt(params.id as string, 10),
     container = document.createElement("div"),
     indexAnchor = document.createElement("a"),
     indexAnchorText = document.createTextNode("Index"),
@@ -197,7 +197,7 @@ function createSidebar(params: Params, data: Data, annotator: Annotator) {
   exportButton.className = "edit-sidebar-submit"
   exportButton.addEventListener("click", function () {
     const filename = data.annotationURLs
-      ? data.annotationURLs[parseInt(params.id, 10)].split(/[\\/]/).pop()
+      ? data.annotationURLs[parseInt(params.id as string, 10)].split(/[\\/]/).pop()
       : params.id + ".png"
     downloadURI(annotator.export(), filename)
   })
@@ -408,7 +408,7 @@ function downloadURI(uri: string, filename: string) {
 
 // Entry point.
 export function render(data: Data, params: Params) {
-  const id = parseInt(params.id, 10)
+  const id = typeof params.id === "number" ? params.id : parseInt(params.id, 10)
   if (isNaN(id)) throw "Invalid id"
   const annotator = new Annotator(data.imageURLs[id], {
       width: params.width,

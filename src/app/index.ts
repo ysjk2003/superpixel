@@ -34,8 +34,8 @@ export function render(data: Data, params: Params) {
   document.body.appendChild(createLabelOptions(params, data.labels))
   for (let i = pagination.begin(); i < pagination.end(); ++i) {
     const viewer = new Viewer(data.imageURLs[i], data.annotationURLs[i], {
-        width: params.width || 240,
-        height: params.height || 320,
+        width: 240,
+        height: 320,
         colormap: data.colormap,
         labels: data.labels,
         excludedLegends: [0],
