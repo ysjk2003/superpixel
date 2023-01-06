@@ -11,17 +11,35 @@
  */
 import Layer from "../image/layer"
 
+type Options = {
+  colormap: number[][]
+  labels: string[]
+  width: number
+  height: number
+  onerror?: () => void
+  onload?: () => void
+  overlay: string
+  excludedLegends: number[]
+}
+
 // Segment viewer.
 export default class Viewer {
-  constructor(imageURL, annotationURL, options) {
-    if (typeof options === "undefined") options = {}
+  private colormap: number[][]
+  private labels: string[]
+  private layers: { image: Layer; visualization: Layer }
+  public container: HTMLDivElement
+  private _unloadedLayers: number
+  private width: number
+  private height: number
+
+  constructor(imageURL: string, annotationURL: string, options?: Options) {
     this.colormap = options.colormap || [
       [255, 255, 255],
       [255, 0, 0],
     ]
     this.labels = options.labels
     this._createLayers(imageURL, annotationURL, options)
-    var viewer = this
+    const viewer = this
     this.layers.image.load(imageURL, {
       width: options.width,
       height: options.height,
@@ -41,8 +59,8 @@ export default class Viewer {
     if (options.overlay) viewer.addOverlay(options.overlay)
   }
 
-  _createLayers(imageURL, annotationURL, options) {
-    var onload = options.onload
+  _createLayers(imageURL: string, annotationURL: string, options: Options) {
+    const onload = options.onload
     delete options.onload
     this.container = document.createElement("div")
     this.container.classList.add("segment-viewer-container")
@@ -51,8 +69,8 @@ export default class Viewer {
       visualization: new Layer(options),
     }
     options.onload = onload
-    for (var key in this.layers) {
-      var canvas = this.layers[key].canvas
+    for (const key in this.layers) {
+      const canvas = this.layers[key as keyof typeof this.layers].canvas
       canvas.classList.add("segment-viewer-layer")
       this.container.appendChild(canvas)
     }
@@ -60,12 +78,12 @@ export default class Viewer {
     this._resizeLayers(options)
   }
 
-  _resizeLayers(options) {
+  _resizeLayers(options: Options) {
     this.width = options.width || this.layers.image.canvas.width
     this.height = options.height || this.layers.image.canvas.height
-    for (var key in this.layers) {
+    for (const key in this.layers) {
       if (key !== "image") {
-        var canvas = this.layers[key].canvas
+        const canvas = this.layers[key as keyof typeof this.layers].canvas
         canvas.width = this.width
         canvas.height = this.height
       }
@@ -74,12 +92,12 @@ export default class Viewer {
     this.container.style.height = this.height + "px"
   }
 
-  _initializeIfReady(options) {
+  _initializeIfReady(options: Options) {
     if (--this._unloadedLayers > 0) return
     this._resizeLayers(options)
-    var viewer = this
+    const viewer = this
     this.layers.visualization.process(function () {
-      var uniqueIndex = getUniqueIndex(this.imageData.data)
+      const uniqueIndex = getUniqueIndex(this.imageData.data)
       this.applyColormap(viewer.colormap)
       this.setAlpha(192)
       this.render()
@@ -92,23 +110,22 @@ export default class Viewer {
     })
   }
 
-  addOverlay(text) {
-    var overlayContainer = document.createElement("div")
+  addOverlay(text: string) {
+    const overlayContainer = document.createElement("div")
     overlayContainer.classList.add("segment-viewer-overlay-container")
     if (text) overlayContainer.appendChild(document.createTextNode(text))
     this.container.appendChild(overlayContainer)
   }
 
-  addLegend(index) {
-    var legendContainer = document.createElement("div"),
-      i
+  addLegend(index?: number[]) {
+    const legendContainer = document.createElement("div")
     if (typeof index === "undefined") {
       index = []
-      for (i = 0; i < this.labels.length; ++i) index.push(i)
+      for (let i = 0; i < this.labels.length; ++i) index.push(i)
     }
     legendContainer.classList.add("segment-viewer-legend-container")
-    for (i = 0; i < index.length; ++i) {
-      var label = this.labels[index[i]],
+    for (let i = 0; i < index.length; ++i) {
+      const label = this.labels[index[i]],
         color = this.colormap[index[i]],
         legendItem = document.createElement("div"),
         colorbox = document.createElement("span"),
@@ -126,9 +143,9 @@ export default class Viewer {
   }
 }
 
-export const getUniqueIndex = function (data) {
-  var uniqueIndex = []
-  for (var i = 0; i < data.length; i += 4) {
+export const getUniqueIndex = function (data: number[]) {
+  const uniqueIndex = []
+  for (let i = 0; i < data.length; i += 4) {
     if (uniqueIndex.indexOf(data[i]) < 0) {
       uniqueIndex.push(data[i])
     }
