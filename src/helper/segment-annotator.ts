@@ -16,11 +16,71 @@ import Layer from "../image/layer"
 import * as morph from "../image/morph"
 import maxFilter from "../image/morph/max-filter"
 import { createSegment } from "../image/segmentation"
+import PFF from "../image/segmentation/pff"
+import SLIC from "../image/segmentation/slic"
+import SLICO from "../image/segmentation/slico"
+import WatershedSegmentation from "../image/segmentation/watershed"
+
+type Options = {
+  onload: () => void
+  onerror?: () => void
+  onchange: () => void
+  onrightclick: (label: string) => void
+  onleftclick?: () => void
+  onmousemove: (label: string) => void
+  onhighlight?: () => void
+  width: number
+  height: number
+  colormap: number[][]
+  boundaryColor?: number[]
+  boundaryAlpha?: number
+  visualizationAlpha?: number
+  highlightAlpha?: number
+  defaultLabel?: number
+  maxHistoryRecord?: number
+  superpixelOptions: SuperpixelOptions
+  grayscale?: boolean
+}
+
+type SuperpixelOptions = { method: string; regionSize: number; minRegionSize?: number; maxIterations?: number }
+type AnnotatorLayers = { image: Layer; superpixel: Layer; visualization: Layer; annotation: Layer; boundary: Layer }
+type Update = { pixels: number[]; prev: number[]; next: number[] }
 
 // Segment annotator.
 export default class Annotator {
-  constructor(imageURL, options) {
-    options = options || {}
+  private colormap: number[][]
+  private boundaryColor: number[]
+  private boundaryAlpha: number
+  private visualizationAlpha: number
+  private highlightAlpha: number
+  private currentZoom: number
+  private defaultLabel: number
+  private maxHistoryRecord: number
+  private onchange: () => void
+  private onrightclick: (label: string) => void
+  private onleftclick: () => void
+  private onmousemove: (label: string) => void
+  private onhighlight: () => void
+  private mode: string
+  private polygonPoints: number[][]
+  private prevAnnotationImg: null | ImageData
+  private layers: AnnotatorLayers
+  private segmentation: SLIC | SLICO | PFF | WatershedSegmentation
+  private _container: HTMLDivElement
+  private innerContainer: HTMLDivElement
+  private width: number
+  private height: number
+  private currentHistoryRecord: number
+  public currentLabel: number
+  private pixelIndex: number[][]
+  private currentPixels: number[]
+  private history: Update[]
+
+  get container() {
+    return this._container
+  }
+
+  constructor(imageURL: string, options?: Options) {
     if (typeof imageURL !== "string") {
       throw "Invalid imageURL"
     }
@@ -41,11 +101,11 @@ export default class Annotator {
     this.onhighlight = options.onhighlight || null
     this.onmousemove = options.onmousemove || null
     this._createLayers(options)
-    this._initializeHistory(options)
+    this._initializeHistory()
     this.mode = "superpixel"
     this.polygonPoints = []
     this.prevAnnotationImg = null
-    var annotator = this
+    const annotator = this
     this.layers.image.load(imageURL, {
       width: options.width,
       height: options.height,
@@ -56,29 +116,28 @@ export default class Annotator {
     })
   }
 
-  resetSuperpixels(options) {
-    options = options || {}
+  resetSuperpixels(options?: SuperpixelOptions) {
     this.layers.superpixel.copy(this.layers.image)
     this.segmentation = createSegment(this.layers.image.imageData, options)
-    this._updateSuperpixels(options)
+    this._updateSuperpixels()
     return this
   }
 
-  finer(options) {
+  finer() {
     this.segmentation.finer()
-    this._updateSuperpixels(options)
+    this._updateSuperpixels()
     return this
   }
 
-  coarser(options) {
+  coarser() {
     this.segmentation.coarser()
-    this._updateSuperpixels(options)
+    this._updateSuperpixels()
     return this
   }
 
   undo() {
     if (this.currentHistoryRecord < 0) return false
-    var record = this.history[this.currentHistoryRecord--]
+    const record = this.history[this.currentHistoryRecord--]
     this._fillPixels(record.pixels, record.prev)
     this.layers.visualization.render()
     if (typeof this.onchange === "function") this.onchange.call(this)
@@ -87,7 +146,7 @@ export default class Annotator {
 
   redo() {
     if (this.currentHistoryRecord >= this.history.length - 1) return false
-    var record = this.history[++this.currentHistoryRecord]
+    const record = this.history[++this.currentHistoryRecord]
     this._fillPixels(record.pixels, record.next)
     this.layers.visualization.render()
     if (typeof this.onchange === "function") this.onchange.call(this)
@@ -95,10 +154,10 @@ export default class Annotator {
   }
 
   getUniqueLabels() {
-    var uniqueIndex = [],
+    const uniqueIndex = [],
       data = this.layers.annotation.imageData.data
-    for (var i = 0; i < data.length; i += 4) {
-      var label = _getEncodedLabel(data, i)
+    for (let i = 0; i < data.length; i += 4) {
+      const label = _getEncodedLabel(data, i)
       if (uniqueIndex.indexOf(label) < 0) {
         uniqueIndex.push(label)
       }
@@ -108,34 +167,33 @@ export default class Annotator {
     })
   }
 
-  fill(targetLabel) {
-    var pixels = [],
+  fill(targetLabel: number) {
+    const pixels = [],
       annotationData = this.layers.annotation.imageData.data
-    for (var i = 0; i < annotationData.length; i += 4) {
-      var label = _getEncodedLabel(annotationData, i)
+    for (let i = 0; i < annotationData.length; i += 4) {
+      const label = _getEncodedLabel(annotationData, i)
       if (label === targetLabel || targetLabel === undefined) pixels.push(i)
     }
     if (pixels.length > 0) this._updateAnnotation(pixels, this.currentLabel)
     return this
   }
 
-  setAlpha(alpha) {
+  setAlpha(alpha: number) {
     this.visualizationAlpha = Math.max(Math.min(alpha, 255), 0)
     this.layers.visualization.setAlpha(this.visualizationAlpha).render()
     return this
   }
 
-  lessAlpha(scale) {
+  lessAlpha(scale?: number) {
     return this.setAlpha(this.visualizationAlpha - (scale || 1) * 20)
   }
 
-  moreAlpha(scale) {
+  moreAlpha(scale?: number) {
     return this.setAlpha(this.visualizationAlpha + (scale || 1) * 20)
   }
 
-  import(annotationURL, options) {
-    options = options || {}
-    var annotator = this
+  import(annotationURL: string, options?: Options) {
+    const annotator = this
     this.layers.annotation.load(annotationURL, {
       onload: function () {
         if (options.grayscale) this.gray2index()
@@ -158,27 +216,27 @@ export default class Annotator {
   export() {
     this.layers.annotation.setAlpha(255)
     this.layers.annotation.render()
-    var data = this.layers.annotation.canvas.toDataURL()
+    const data = this.layers.annotation.canvas.toDataURL()
     this.layers.annotation.setAlpha(0)
     this.layers.annotation.render()
     return data
   }
 
-  show(layer) {
+  show(layer: keyof typeof this.layers) {
     this.layers[layer].canvas.style.display = "inline-block"
     return this
   }
 
-  hide(layer) {
+  hide(layer: keyof typeof this.layers) {
     this.layers[layer].canvas.style.display = "none"
     return this
   }
 
-  highlightLabel(label) {
-    var pixels = [],
+  highlightLabel(label: number) {
+    const pixels = [],
       annotationData = this.layers.annotation.imageData.data
-    for (var i = 0; i < annotationData.length; i += 4) {
-      var currentLabel = _getEncodedLabel(annotationData, i)
+    for (let i = 0; i < annotationData.length; i += 4) {
+      const currentLabel = _getEncodedLabel(annotationData, i)
       if (currentLabel === label) pixels.push(i)
     }
     this._updateHighlight(pixels)
@@ -190,35 +248,34 @@ export default class Annotator {
     return this
   }
 
-  zoom(scale) {
+  zoom(scale: number) {
     this.currentZoom = Math.max(Math.min(scale || 1.0, 10.0), 1.0)
-    this.innerContainer.style.zoom = this.currentZoom
-    this.innerContainer.style.MozTransform = "scale(" + this.currentZoom + ")"
+    this.innerContainer.style.transform = "scale(" + this.currentZoom + ")"
     return this
   }
 
-  zoomIn(scale) {
+  zoomIn(scale?: number) {
     return this.zoom(this.currentZoom + (scale || 0.25))
   }
 
-  zoomOut(scale) {
+  zoomOut(scale?: number) {
     return this.zoom(this.currentZoom - (scale || 0.25))
   }
 
   denoise() {
-    var indexImage = morph.decodeIndexImage(this.layers.annotation.imageData),
+    const indexImage = morph.decodeIndexImage(this.layers.annotation.imageData),
       result = maxFilter(indexImage)
-    var pixels = new Int32Array(result.data.length)
-    for (var i = 0; i < pixels.length; ++i) pixels[i] = 4 * i
+    const pixels = new Int32Array(result.data.length)
+    for (let i = 0; i < pixels.length; ++i) pixels[i] = 4 * i
     this._updateAnnotation(pixels, result.data)
     return this
   }
 
-  _createLayers(options) {
-    var onload = options.onload
+  _createLayers(options: Options) {
+    const onload = options.onload
     delete options.onload
-    this.container = document.createElement("div")
-    this.container.classList.add("segment-annotator-outer-container")
+    this._container = document.createElement("div")
+    this._container.classList.add("segment-annotator-outer-container")
     this.innerContainer = document.createElement("div")
     this.innerContainer.classList.add("segment-annotator-inner-container")
     this.layers = {
@@ -229,38 +286,37 @@ export default class Annotator {
       annotation: new Layer(options),
     }
     options.onload = onload
-    for (var key in this.layers) {
-      var canvas = this.layers[key].canvas
+    for (const key in this.layers) {
+      const canvas = this.layers[key as keyof typeof this.layers].canvas
       canvas.classList.add("segment-annotator-layer")
       this.innerContainer.appendChild(canvas)
     }
-    this.container.appendChild(this.innerContainer)
+    this._container.appendChild(this.innerContainer)
     this._resizeLayers(options)
   }
 
-  _resizeLayers(options) {
+  _resizeLayers(options: Options) {
     this.width = options.width || this.layers.image.canvas.width
     this.height = options.height || this.layers.image.canvas.height
-    for (var key in this.layers) {
+    for (const key in this.layers) {
       if (key !== "image") {
-        var canvas = this.layers[key].canvas
+        const canvas = this.layers[key as keyof typeof this.layers].canvas
         canvas.width = this.width
         canvas.height = this.height
       }
     }
     this.innerContainer.style.width = this.width + "px"
     this.innerContainer.style.height = this.height + "px"
-    this.container.style.width = this.width + "px"
-    this.container.style.height = this.height + "px"
+    this._container.style.width = this.width + "px"
+    this._container.style.height = this.height + "px"
   }
 
-  _initializeHistory(options) {
+  _initializeHistory() {
     this.history = []
     this.currentHistoryRecord = -1
   }
 
-  _initialize(options) {
-    options = options || {}
+  _initialize(options?: Options) {
     if (!options.width) this._resizeLayers(options)
     this._initializeAnnotationLayer()
     this._initializeVisualizationLayer()
@@ -271,14 +327,14 @@ export default class Annotator {
   }
 
   _initializeEvents() {
-    var canvas = this.layers.annotation.canvas,
+    const canvas = this.layers.annotation.canvas,
       mousestate = { down: false, button: 0 },
       annotator = this
     canvas.oncontextmenu = function () {
       return false
     }
-    function updateIfActive(event) {
-      var offset = annotator._getClickOffset(event),
+    function updateIfActive(event: MouseEvent) {
+      const offset = annotator._getClickOffset(event),
         superpixelData = annotator.layers.superpixel.imageData.data,
         annotationData = annotator.layers.annotation.imageData.data,
         superpixelIndex = _getEncodedLabel(superpixelData, offset),
@@ -321,7 +377,7 @@ export default class Annotator {
     })
     //polygon on/off with ctrl-key
     window.onkeyup = function (e) {
-      var key = e.keyCode ? e.keyCode : e.which
+      const key = e.keyCode ? e.keyCode : e.which
       if (key == 17) {
         if (annotator.mode == "polygon") {
           annotator.mode = "superpixel"
@@ -335,7 +391,7 @@ export default class Annotator {
   }
 
   _updateBoundaryLayer() {
-    var boundaryLayer = this.layers.boundary
+    const boundaryLayer = this.layers.boundary
     boundaryLayer.copy(this.layers.superpixel)
     boundaryLayer.computeEdgemap({
       foreground: this.boundaryColor.concat(this.boundaryAlpha),
@@ -345,7 +401,7 @@ export default class Annotator {
   }
 
   _initializeAnnotationLayer() {
-    var layer = this.layers.annotation
+    const layer = this.layers.annotation
     layer.resize(this.width, this.height)
     this.currentLabel = this.defaultLabel
     layer.fill([this.defaultLabel, 0, 0, 0])
@@ -353,45 +409,47 @@ export default class Annotator {
   }
 
   _initializeVisualizationLayer() {
-    var layer = this.layers.visualization
+    const layer = this.layers.visualization
     layer.resize(this.width, this.height)
-    var initialColor = this.colormap[this.defaultLabel].concat([this.visualizationAlpha])
+    const initialColor = this.colormap[this.defaultLabel].concat([this.visualizationAlpha])
     layer.fill(initialColor)
     layer.render()
   }
 
   _updateSuperpixels() {
-    var annotator = this
-    this.layers.superpixel.process(function (imageData) {
+    const annotator = this
+    this.layers.superpixel.process(function (imageData: ImageData) {
       imageData.data.set(annotator.segmentation.result.data)
+      // TODO:: separated result and numb segments
+      //@ts-ignore
       annotator._createPixelIndex(annotator.segmentation.result.numSegments)
       annotator._updateBoundaryLayer()
       this.setAlpha(0).render()
     })
   }
 
-  _createPixelIndex(numSegments) {
-    var pixelIndex = new Array(numSegments),
-      data = this.layers.superpixel.imageData.data,
-      i
-    for (i = 0; i < numSegments; ++i) pixelIndex[i] = []
-    for (i = 0; i < data.length; i += 4) {
-      var index = data[i] | (data[i + 1] << 8) | (data[i + 2] << 16)
+  _createPixelIndex(numSegments: number) {
+    const pixelIndex = new Array(numSegments),
+      data = this.layers.superpixel.imageData.data
+
+    for (let i = 0; i < numSegments; ++i) pixelIndex[i] = []
+    for (let i = 0; i < data.length; i += 4) {
+      const index = data[i] | (data[i + 1] << 8) | (data[i + 2] << 16)
       pixelIndex[index].push(i)
     }
     this.currentPixels = null
     this.pixelIndex = pixelIndex
   }
 
-  _getClickOffset(event) {
-    var pos = this._getClickPos(event),
+  _getClickOffset(event: MouseEvent) {
+    const pos = this._getClickPos(event),
       x = pos[0],
       y = pos[1]
     return 4 * (y * this.layers.visualization.canvas.width + x)
   }
 
-  _getClickPos(event) {
-    var container = this.container,
+  _getClickPos(event: MouseEvent) {
+    const container = this._container,
       containerRect = container.getBoundingClientRect(),
       offsetLeft =
         containerRect.left +
@@ -400,25 +458,25 @@ export default class Annotator {
       offsetTop =
         containerRect.top +
         (window.pageYOffset || document.documentElement.scrollTop) -
-        (document.documentElement.clientTop || 0),
-      x = Math.round(
+        (document.documentElement.clientTop || 0)
+    let x = Math.round(
         (event.pageX - offsetLeft + container.scrollLeft) * (container.offsetWidth / container.scrollWidth),
       ),
       y = Math.round(
         (event.pageY - offsetTop + container.scrollTop) * (container.offsetHeight / container.scrollHeight),
-      ),
-      x = Math.max(Math.min(x, this.layers.visualization.canvas.width - 1), 0)
+      )
+    x = Math.max(Math.min(x, this.layers.visualization.canvas.width - 1), 0)
     y = Math.max(Math.min(y, this.layers.visualization.canvas.height - 1), 0)
     return [x, y]
   }
 
-  _addPolygonPoint(event) {
-    var annotator = this,
+  _addPolygonPoint(event: MouseEvent) {
+    const annotator = this,
       pos = this._getClickPos(event),
       x = pos[0],
       y = pos[1]
     //get canvas.
-    var canvas = annotator.layers.annotation.canvas,
+    const canvas = annotator.layers.annotation.canvas,
       ctx = canvas.getContext("2d")
     if (this.polygonPoints.length === 0) {
       ctx.save() // remember previous state.
@@ -439,7 +497,7 @@ export default class Annotator {
   }
 
   _emptyPolygonPoints() {
-    var annotator = this,
+    const annotator = this,
       ctx = annotator.layers.annotation.canvas.getContext("2d")
     ctx.restore()
     if (annotator.prevAnnotationImg) ctx.putImageData(annotator.prevAnnotationImg, 0, 0)
@@ -448,14 +506,13 @@ export default class Annotator {
   }
 
   _addPolygonToAnnotation() {
-    var annotator = this,
-      canvas = document.createElement("canvas"),
-      x,
-      y
+    const annotator = this,
+      canvas = document.createElement("canvas")
+    let x, y
     // set canvas dimensions.
     canvas.width = annotator.layers.annotation.canvas.width
     canvas.height = annotator.layers.annotation.canvas.height
-    var ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext("2d")
     ctx.fillStyle = "rgba(0, 0, 255, 255)"
     ctx.beginPath()
     ctx.moveTo(annotator.polygonPoints[0][0], annotator.polygonPoints[0][1])
@@ -468,13 +525,13 @@ export default class Annotator {
     ctx.closePath()
     ctx.fill()
     //get pixels within polygon.
-    var colorToCheck = [0, 0, 255, 255],
+    const colorToCheck = [0, 0, 255, 255],
       imageData = ctx.getImageData(0, 0, canvas.width, canvas.height),
       data = imageData.data,
       pixelsPolygon = []
     for (x = 0; x < canvas.width; ++x) {
       for (y = 0; y < canvas.height; ++y) {
-        var index = (x + y * imageData.width) * 4
+        const index = (x + y * imageData.width) * 4
         if (
           data[index + 0] == colorToCheck[0] &&
           data[index + 1] == colorToCheck[1] &&
@@ -492,22 +549,22 @@ export default class Annotator {
 
   _checkLineIntersection() {
     if (this.polygonPoints.length < 4) return false
-    var newLineStartX = this.polygonPoints[this.polygonPoints.length - 2][0],
+    const newLineStartX = this.polygonPoints[this.polygonPoints.length - 2][0],
       newLineStartY = this.polygonPoints[this.polygonPoints.length - 2][1],
       newLineEndX = this.polygonPoints[this.polygonPoints.length - 1][0],
       newLineEndY = this.polygonPoints[this.polygonPoints.length - 1][1]
 
     for (let i = 1; i < this.polygonPoints.length - 2; ++i) {
-      var line1StartX = this.polygonPoints[i - 1][0],
+      const line1StartX = this.polygonPoints[i - 1][0],
         line1StartY = this.polygonPoints[i - 1][1],
         line1EndX = this.polygonPoints[i][0],
         line1EndY = this.polygonPoints[i][1],
         denominator =
           (newLineEndY - newLineStartY) * (line1EndX - line1StartX) -
-          (newLineEndX - newLineStartX) * (line1EndY - line1StartY),
-        a = line1StartY - newLineStartY,
-        b = line1StartX - newLineStartX,
-        numerator1 = (newLineEndX - newLineStartX) * a - (newLineEndY - newLineStartY) * b,
+          (newLineEndX - newLineStartX) * (line1EndY - line1StartY)
+      let a = line1StartY - newLineStartY,
+        b = line1StartX - newLineStartX
+      const numerator1 = (newLineEndX - newLineStartX) * a - (newLineEndY - newLineStartY) * b,
         numerator2 = (line1EndX - line1StartX) * a - (line1EndY - line1StartY) * b
       a = numerator1 / denominator
       b = numerator2 / denominator
@@ -516,19 +573,18 @@ export default class Annotator {
     return false
   }
 
-  _setMode(mode) {
+  _setMode(mode: string) {
     this.mode = mode
   }
 
-  _updateHighlight(pixels) {
-    var visualizationData = this.layers.visualization.imageData.data,
+  _updateHighlight(pixels: number[]) {
+    const visualizationData = this.layers.visualization.imageData.data,
       boundaryData = this.layers.boundary.imageData.data,
-      annotationData = this.layers.annotation.imageData.data,
-      i,
-      color,
-      offset
+      annotationData = this.layers.annotation.imageData.data
+
+    let color, offset
     if (this.currentPixels !== null) {
-      for (i = 0; i < this.currentPixels.length; ++i) {
+      for (let i = 0; i < this.currentPixels.length; ++i) {
         offset = this.currentPixels[i]
         color = this.colormap[_getEncodedLabel(annotationData, offset)]
         visualizationData[offset + 0] = color[0]
@@ -539,7 +595,7 @@ export default class Annotator {
     }
     this.currentPixels = pixels
     if (this.currentPixels !== null) {
-      for (i = 0; i < pixels.length; ++i) {
+      for (let i = 0; i < pixels.length; ++i) {
         offset = pixels[i]
         if (boundaryData[offset + 3]) {
           visualizationData[offset + 0] = this.boundaryColor[0]
@@ -556,12 +612,12 @@ export default class Annotator {
     if (typeof this.onhighlight === "function") this.onhighlight.call(this)
   }
 
-  _fillPixels(pixels, labels) {
+  _fillPixels(pixels: number[], labels: number[]) {
     if (pixels.length !== labels.length) throw "Invalid fill: " + pixels.length + " !== " + labels.length
-    var annotationData = this.layers.annotation.imageData.data,
+    const annotationData = this.layers.annotation.imageData.data,
       visualizationData = this.layers.visualization.imageData.data
-    for (var i = 0; i < pixels.length; ++i) {
-      var offset = pixels[i],
+    for (let i = 0; i < pixels.length; ++i) {
+      const offset = pixels[i],
         label = labels[i],
         color = this.colormap[label]
       _setEncodedLabel(annotationData, offset, label)
@@ -571,10 +627,9 @@ export default class Annotator {
     }
   }
 
-  _updateAnnotation(pixels, labels) {
-    var updates
-    labels = typeof labels === "object" ? labels : _fillArray(new Int32Array(pixels.length), labels)
-    updates = this._getDifferentialUpdates(pixels, labels)
+  _updateAnnotation(pixels: number[] | Int32Array, labels: number[] | Int32Array | number) {
+    const _labels = typeof labels === "object" ? labels : _fillArray(new Int32Array(pixels.length), labels)
+    const updates = this._getDifferentialUpdates(pixels, _labels)
     if (updates.pixels.length === 0) return this
     this._updateHistory(updates)
     this._fillPixels(updates.pixels, updates.next)
@@ -583,12 +638,12 @@ export default class Annotator {
     return this
   }
 
-  _getDifferentialUpdates(pixels, labels) {
+  _getDifferentialUpdates(pixels: number[] | Int32Array, labels: number[] | Int32Array) {
     if (pixels.length !== labels.length) throw "Invalid labels"
-    var annotationData = this.layers.annotation.imageData.data,
-      updates = { pixels: [], prev: [], next: [] }
-    for (var i = 0; i < pixels.length; ++i) {
-      var label = _getEncodedLabel(annotationData, pixels[i])
+    const annotationData = this.layers.annotation.imageData.data,
+      updates: Update = { pixels: [], prev: [], next: [] }
+    for (let i = 0; i < pixels.length; ++i) {
+      const label = _getEncodedLabel(annotationData, pixels[i])
       if (label !== labels[i]) {
         updates.pixels.push(pixels[i])
         updates.prev.push(label)
@@ -598,21 +653,21 @@ export default class Annotator {
     return updates
   }
 
-  _updateHistory(updates) {
+  _updateHistory(updates: Update) {
     this.history = this.history.slice(0, this.currentHistoryRecord + 1)
     this.history.push(updates)
     if (this.history.length > this.maxHistoryRecord) this.history = this.history.slice(1, this.history.length)
     else ++this.currentHistoryRecord
   }
 
-  brush(pos, label) {
-    var offsets = [],
+  brush(pos: number[], label: number) {
+    const offsets = [],
       labels = []
-    for (var y = -2; y <= 2; y++) {
-      for (var x = -2; x <= 2; x++) {
+    for (let y = -2; y <= 2; y++) {
+      for (let x = -2; x <= 2; x++) {
         // it is circle bitches
         if (x * x + y * y > 7) continue
-        var offset = 4 * ((pos[1] + y) * this.layers.visualization.canvas.width + (pos[0] + x))
+        const offset = 4 * ((pos[1] + y) * this.layers.visualization.canvas.width + (pos[0] + x))
         offsets.push(offset)
         labels.push(label)
       }
@@ -623,16 +678,16 @@ export default class Annotator {
   }
 }
 
-function _fillArray(array, value) {
-  for (var i = 0; i < array.length; ++i) array[i] = value
+function _fillArray(array: Int32Array, value: number) {
+  for (let i = 0; i < array.length; ++i) array[i] = value
   return array
 }
 
-function _getEncodedLabel(array, offset) {
+function _getEncodedLabel(array: Uint8ClampedArray, offset: number) {
   return array[offset] | (array[offset + 1] << 8) | (array[offset + 2] << 16)
 }
 
-function _setEncodedLabel(array, offset, label) {
+function _setEncodedLabel(array: Uint8ClampedArray, offset: number, label: number) {
   array[offset + 0] = label & 255
   array[offset + 1] = (label >>> 8) & 255
   array[offset + 2] = (label >>> 16) & 255

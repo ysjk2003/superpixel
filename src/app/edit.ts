@@ -411,8 +411,8 @@ export function render(data: Data, params: Params) {
   const id = typeof params.id === "number" ? params.id : parseInt(params.id, 10)
   if (isNaN(id)) throw "Invalid id"
   const annotator = new Annotator(data.imageURLs[id], {
-      width: params.width,
-      height: params.height,
+      width: params.width as number | undefined,
+      height: params.height as number | undefined,
       colormap: data.colormap,
       superpixelOptions: { method: "slic", regionSize: 25 },
       onload: function () {
