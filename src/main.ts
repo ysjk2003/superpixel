@@ -5,7 +5,7 @@ import * as indexPage from "./app/index"
 import Colormap from "./helper/colormap"
 import * as util from "./helper/util"
 
-type Color = [number, number, number]
+export type Color = [number, number, number]
 export type Params = { [key: string]: string | number }
 export type Data = {
   colormap: Color[]
@@ -19,17 +19,19 @@ const dataURL = "./data/example.json" // Change this to another dataset.
 const params: Params = util.getQueryParams() as Params
 
 // Create a colormap for display. The following is an example.
-function createColormap(label: string, labels: string[]) {
+function createColormap(label: string, labels: string[]): Color[] {
   return label
     ? Colormap.single({
         size: labels.length,
         index: labels.indexOf(label),
       })
-    : [
-        [255, 255, 255],
-        [226, 196, 196],
-        [64, 32, 32],
-      ].concat(
+    : (
+        [
+          [255, 255, 255],
+          [226, 196, 196],
+          [64, 32, 32],
+        ] as Color[]
+      ).concat(
         Colormap.hsv({
           size: labels.length - 3,
         }),
