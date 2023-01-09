@@ -434,8 +434,8 @@ export function render(data: Data, params: Params) {
       onmousemove: highlightLabel,
     }),
     imageLayer = new Layer(data.imageURLs[id], {
-      width: params.width,
-      height: params.height,
+      width: params.width as number | undefined,
+      height: params.height as number | undefined,
     })
   document.body.appendChild(createNavigationMenu(params, data))
   document.body.appendChild(createMainDisplay(params, data, annotator, imageLayer))

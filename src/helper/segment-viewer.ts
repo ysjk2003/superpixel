@@ -65,8 +65,8 @@ export default class Viewer {
     this.container = document.createElement("div")
     this.container.classList.add("segment-viewer-container")
     this.layers = {
-      image: new Layer(options),
-      visualization: new Layer(options),
+      image: new Layer(undefined, options),
+      visualization: new Layer(undefined, options),
     }
     options.onload = onload
     for (const key in this.layers) {

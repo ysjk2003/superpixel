@@ -20,6 +20,7 @@ import PFF from "../image/segmentation/pff"
 import SLIC from "../image/segmentation/slic"
 import SLICO from "../image/segmentation/slico"
 import WatershedSegmentation from "../image/segmentation/watershed"
+import { Color } from "../main"
 
 type Options = {
   onload: () => void
@@ -107,12 +108,12 @@ export default class Annotator {
     this.prevAnnotationImg = null
     const annotator = this
     this.layers.image.load(imageURL, {
-      width: options.width,
-      height: options.height,
+      width: options?.width,
+      height: options?.height,
       onload: function () {
         annotator._initialize(options)
       },
-      onerror: options.onerror,
+      onerror: options?.onerror,
     })
   }
 
@@ -279,11 +280,11 @@ export default class Annotator {
     this.innerContainer = document.createElement("div")
     this.innerContainer.classList.add("segment-annotator-inner-container")
     this.layers = {
-      image: new Layer(options),
-      superpixel: new Layer(options),
-      visualization: new Layer(options),
-      boundary: new Layer(options),
-      annotation: new Layer(options),
+      image: new Layer(undefined, options),
+      superpixel: new Layer(undefined, options),
+      visualization: new Layer(undefined, options),
+      boundary: new Layer(undefined, options),
+      annotation: new Layer(undefined, options),
     }
     options.onload = onload
     for (const key in this.layers) {
