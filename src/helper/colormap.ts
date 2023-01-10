@@ -59,7 +59,9 @@ function hsv2rgb(h: number, s: number, v: number) {
     p = v * (1 - s),
     q = v * (1 - f * s),
     t = v * (1 - (1 - f) * s)
-  let r, g, b
+  let r = 0,
+    g = 0,
+    b = 0
   switch (i % 6) {
     case 0:
       r = v

@@ -158,19 +158,19 @@ function createImageTopMenu(params: Params, data: Data, annotator: Annotator) {
 }
 
 // Set up the automatic flash of boundary.
-let boundaryFlashTimeoutID: number = null
+let boundaryFlashTimeoutID: number | null = null
 function boundaryFlash() {
   const boundaryButton = document.getElementById("boundary-button")
   if (boundaryFlashTimeoutID) {
     window.clearTimeout(boundaryFlashTimeoutID)
     boundaryFlashTimeoutID = window.setTimeout(function () {
-      boundaryButton.click()
+      boundaryButton?.click()
       boundaryFlashTimeoutID = null
     }, 1000)
-  } else if (!boundaryButton.classList.contains("edit-image-top-button-enabled")) {
-    boundaryButton.click()
+  } else if (!boundaryButton?.classList.contains("edit-image-top-button-enabled")) {
+    boundaryButton?.click()
     boundaryFlashTimeoutID = window.setTimeout(function () {
-      boundaryButton.click()
+      boundaryButton?.click()
       boundaryFlashTimeoutID = null
     }, 1000)
   }
@@ -199,7 +199,7 @@ function createSidebar(params: Params, data: Data, annotator: Annotator) {
     const filename = data.annotationURLs
       ? data.annotationURLs[parseInt(params.id as string, 10)].split(/[\\/]/).pop()
       : params.id + ".png"
-    downloadURI(annotator.export(), filename)
+    if (filename) downloadURI(annotator.export(), filename)
   })
   spacer1.className = "edit-sidebar-spacer"
   undoButton.className = "edit-sidebar-button"
@@ -324,7 +324,7 @@ function createLabelButton(data: Data, value: string, index: number, annotator: 
 }
 
 // Hightlight legend labels.
-function highlightLabel(label: string) {
+function highlightLabel(label: number | null) {
   const highlightClass = "edit-sidebar-button-highlight",
     elements = document.getElementsByClassName(highlightClass)
   for (let i = 0; i < elements.length; ++i) elements[i].classList.remove(highlightClass)
@@ -421,15 +421,15 @@ export function render(data: Data, params: Params) {
         boundaryFlash()
       },
       onchange: function () {
-        const activeLabels = this.getUniqueLabels(),
+        const activeLabels = annotator.getUniqueLabels(),
           legendClass = "edit-sidebar-legend-label",
           legendActiveClass = "edit-sidebar-legend-label-active",
           elements = document.getElementsByClassName(legendClass)
         for (let i = 0; i < elements.length; ++i) elements[i].classList.remove(legendActiveClass)
         for (let i = 0; i < activeLabels.length; ++i) elements[activeLabels[i]].classList.add(legendActiveClass)
       },
-      onrightclick: function (label: string) {
-        document.getElementById("label-" + label + "-button").click()
+      onrightclick: function (label: number) {
+        document.getElementById("label-" + label + "-button")?.click()
       },
       onmousemove: highlightLabel,
     }),

@@ -1,7 +1,7 @@
-import { Params } from "../main"
+import { Data, Params } from "../main"
 
 // Get JSON by AJAX request.
-export function requestJSON(url: string, callback: (data: object) => void) {
+export function requestJSON(url: string, callback: (data: Data) => void) {
   const xmlhttp = new XMLHttpRequest()
   xmlhttp.onreadystatechange = function () {
     if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {

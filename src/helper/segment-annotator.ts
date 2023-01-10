@@ -20,18 +20,17 @@ import PFF from "../image/segmentation/pff"
 import SLIC from "../image/segmentation/slic"
 import SLICO from "../image/segmentation/slico"
 import WatershedSegmentation from "../image/segmentation/watershed"
-import { Color } from "../main"
 
 type Options = {
-  onload: () => void
-  onerror?: () => void
+  onload?: () => void
+  onerror?: () => OnErrorEventHandler
   onchange: () => void
-  onrightclick: (label: string) => void
+  onrightclick: (label: number) => void
   onleftclick?: () => void
-  onmousemove: (label: string) => void
+  onmousemove: (label: number | null) => void
   onhighlight?: () => void
-  width: number
-  height: number
+  width?: number
+  height?: number
   colormap: number[][]
   boundaryColor?: number[]
   boundaryAlpha?: number
@@ -57,31 +56,31 @@ export default class Annotator {
   private currentZoom: number
   private defaultLabel: number
   private maxHistoryRecord: number
-  private onchange: () => void
-  private onrightclick: (label: string) => void
-  private onleftclick: () => void
-  private onmousemove: (label: string) => void
-  private onhighlight: () => void
+  private onchange: () => void | null
+  private onrightclick: (label: number) => void | null
+  private onleftclick: ((label: number) => void) | null
+  private onmousemove: (label: number | null) => void | null
+  private onhighlight: (() => void) | null
   private mode: string
   private polygonPoints: number[][]
   private prevAnnotationImg: null | ImageData
-  private layers: AnnotatorLayers
-  private segmentation: SLIC | SLICO | PFF | WatershedSegmentation
-  private _container: HTMLDivElement
-  private innerContainer: HTMLDivElement
-  private width: number
-  private height: number
-  private currentHistoryRecord: number
-  public currentLabel: number
-  private pixelIndex: number[][]
-  private currentPixels: number[]
-  private history: Update[]
+  private layers!: AnnotatorLayers
+  private segmentation!: SLIC | SLICO | PFF | WatershedSegmentation
+  private _container!: HTMLDivElement
+  private innerContainer!: HTMLDivElement
+  private width: number = 0
+  private height: number = 0
+  private currentHistoryRecord: number = 0
+  public currentLabel: number = 0
+  private pixelIndex: number[][] = []
+  private currentPixels: number[] | null = null
+  private history: Update[] = []
 
   get container() {
     return this._container
   }
 
-  constructor(imageURL: string, options?: Options) {
+  constructor(imageURL: string, options: Options) {
     if (typeof imageURL !== "string") {
       throw "Invalid imageURL"
     }
@@ -196,20 +195,20 @@ export default class Annotator {
   import(annotationURL: string, options?: Options) {
     const annotator = this
     this.layers.annotation.load(annotationURL, {
-      onload: function () {
-        if (options.grayscale) this.gray2index()
+      onload: function (this: Layer) {
+        if (options?.grayscale) this.gray2index()
         annotator.layers.visualization
           .copy(this)
           .applyColormap(annotator.colormap)
           .setAlpha(annotator.visualizationAlpha)
           .render()
         this.setAlpha(0).render()
-        this.history = []
-        this.currentHistoryRecord = -1
-        if (typeof options.onload === "function") options.onload.call(annotator)
+        annotator.history = []
+        annotator.currentHistoryRecord = -1
+        if (typeof options?.onload === "function") options?.onload.call(annotator)
         if (typeof annotator.onchange === "function") annotator.onchange.call(annotator)
       },
-      onerror: options.onerror,
+      onerror: options?.onerror,
     })
     return this
   }
@@ -274,7 +273,7 @@ export default class Annotator {
 
   _createLayers(options: Options) {
     const onload = options.onload
-    delete options.onload
+    if (options.onload) delete options.onload
     this._container = document.createElement("div")
     this._container.classList.add("segment-annotator-outer-container")
     this.innerContainer = document.createElement("div")
@@ -317,7 +316,7 @@ export default class Annotator {
     this.currentHistoryRecord = -1
   }
 
-  _initialize(options?: Options) {
+  _initialize(options: Options) {
     if (!options.width) this._resizeLayers(options)
     this._initializeAnnotationLayer()
     this._initializeVisualizationLayer()
@@ -419,8 +418,8 @@ export default class Annotator {
 
   _updateSuperpixels() {
     const annotator = this
-    this.layers.superpixel.process(function (imageData: ImageData) {
-      imageData.data.set(annotator.segmentation.result.data)
+    this.layers.superpixel.process(function (this: Layer, imageData: ImageData) {
+      if (annotator.segmentation.result?.data) imageData.data.set(annotator.segmentation.result.data)
       // TODO:: separated result and numb segments
       //@ts-ignore
       annotator._createPixelIndex(annotator.segmentation.result.numSegments)
@@ -479,6 +478,7 @@ export default class Annotator {
     //get canvas.
     const canvas = annotator.layers.annotation.canvas,
       ctx = canvas.getContext("2d")
+    if (!ctx) return
     if (this.polygonPoints.length === 0) {
       ctx.save() // remember previous state.
       annotator.prevAnnotationImg = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -500,6 +500,7 @@ export default class Annotator {
   _emptyPolygonPoints() {
     const annotator = this,
       ctx = annotator.layers.annotation.canvas.getContext("2d")
+    if (!ctx) return
     ctx.restore()
     if (annotator.prevAnnotationImg) ctx.putImageData(annotator.prevAnnotationImg, 0, 0)
     //reset polygon-points
@@ -514,6 +515,7 @@ export default class Annotator {
     canvas.width = annotator.layers.annotation.canvas.width
     canvas.height = annotator.layers.annotation.canvas.height
     const ctx = canvas.getContext("2d")
+    if (!ctx) return
     ctx.fillStyle = "rgba(0, 0, 255, 255)"
     ctx.beginPath()
     ctx.moveTo(annotator.polygonPoints[0][0], annotator.polygonPoints[0][1])
@@ -578,7 +580,7 @@ export default class Annotator {
     this.mode = mode
   }
 
-  _updateHighlight(pixels: number[]) {
+  _updateHighlight(pixels: number[] | null) {
     const visualizationData = this.layers.visualization.imageData.data,
       boundaryData = this.layers.boundary.imageData.data,
       annotationData = this.layers.annotation.imageData.data
@@ -595,7 +597,7 @@ export default class Annotator {
       }
     }
     this.currentPixels = pixels
-    if (this.currentPixels !== null) {
+    if (this.currentPixels !== null && pixels !== null) {
       for (let i = 0; i < pixels.length; ++i) {
         offset = pixels[i]
         if (boundaryData[offset + 3]) {

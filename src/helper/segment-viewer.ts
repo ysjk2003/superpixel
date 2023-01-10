@@ -16,7 +16,7 @@ type Options = {
   labels: string[]
   width: number
   height: number
-  onerror?: () => void
+  onerror?: () => OnErrorEventHandler
   onload?: () => void
   overlay: string
   excludedLegends: number[]
@@ -26,13 +26,13 @@ type Options = {
 export default class Viewer {
   private colormap: number[][]
   private labels: string[]
-  private layers: { image: Layer; visualization: Layer }
-  public container: HTMLDivElement
-  private _unloadedLayers: number
-  private width: number
-  private height: number
+  private layers!: { image: Layer; visualization: Layer }
+  public container!: HTMLDivElement
+  private _unloadedLayers!: number
+  private width!: number
+  private height!: number
 
-  constructor(imageURL: string, annotationURL: string, options?: Options) {
+  constructor(imageURL: string, annotationURL: string, options: Options) {
     this.colormap = options.colormap || [
       [255, 255, 255],
       [255, 0, 0],
@@ -96,7 +96,7 @@ export default class Viewer {
     if (--this._unloadedLayers > 0) return
     this._resizeLayers(options)
     const viewer = this
-    this.layers.visualization.process(function () {
+    this.layers.visualization.process(function (this: Layer, imageData: ImageData) {
       const uniqueIndex = getUniqueIndex(this.imageData.data)
       this.applyColormap(viewer.colormap)
       this.setAlpha(192)
@@ -143,7 +143,7 @@ export default class Viewer {
   }
 }
 
-export const getUniqueIndex = function (data: number[]) {
+export const getUniqueIndex = function (data: Uint8ClampedArray) {
   const uniqueIndex = []
   for (let i = 0; i < data.length; i += 4) {
     if (uniqueIndex.indexOf(data[i]) < 0) {

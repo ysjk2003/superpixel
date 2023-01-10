@@ -16,7 +16,7 @@ import { Color } from "../main"
 type Options = {
   width?: number
   height?: number
-  onerror?: () => void
+  onerror?: () => OnErrorEventHandler
   onload?: () => void
   imageSmoothingEnabled?: boolean
 }
@@ -24,7 +24,7 @@ type Options = {
 // Canvas wrapper object.
 export default class Layer {
   private _canvas: HTMLCanvasElement
-  private _imageData: ImageData
+  private _imageData!: ImageData
 
   get imageData() {
     return this._imageData
@@ -44,7 +44,7 @@ export default class Layer {
     }
   }
 
-  load(source: string | HTMLImageElement, options?: Options | (() => void)) {
+  load(source: string | HTMLImageElement, options: Options | ((this: Layer) => void)) {
     const _options: Options = typeof options === "function" ? { onload: options } : options
     let image: HTMLImageElement
     const layer = this
@@ -64,7 +64,7 @@ export default class Layer {
   _onImageLoad(image: HTMLImageElement, options: Options) {
     this._canvas.width = options.width || image.width
     this._canvas.height = options.height || image.height
-    const context = this._canvas.getContext("2d")
+    const context = this._canvas.getContext("2d") as CanvasRenderingContext2D
     this._setImageSmoothing(context, options)
     context.drawImage(image, 0, 0, image.width, image.height, 0, 0, this._canvas.width, this._canvas.height)
     this._imageData = context.getImageData(0, 0, this._canvas.width, this._canvas.height)
@@ -76,7 +76,7 @@ export default class Layer {
     if (typeof options === "function") options = { onload: options }
     this._canvas.width = source.width
     this._canvas.height = source.height
-    const context = this._canvas.getContext("2d")
+    const context = this._canvas.getContext("2d") as CanvasRenderingContext2D
     this._setImageSmoothing(context, options)
     if (source instanceof ImageData) context.putImageData(source, 0, 0)
     else context.drawImage(source, 0, 0, this._canvas.width, this._canvas.height)
@@ -89,11 +89,11 @@ export default class Layer {
     if (typeof options === "function") options = { onload: options }
     this._canvas.width = imageData.width
     this._canvas.height = imageData.height
-    const context = this._canvas.getContext("2d")
+    const context = this._canvas.getContext("2d") as CanvasRenderingContext2D
     this._setImageSmoothing(context, options)
     context.drawImage(imageData, 0, 0, this._canvas.width, this._canvas.height)
     this._imageData = context.getImageData(0, 0, this._canvas.width, this._canvas.height)
-    if (typeof options.onload === "function") options.onload.call(this)
+    if (typeof options?.onload === "function") options?.onload.call(this)
     return this
   }
 
@@ -114,7 +114,7 @@ export default class Layer {
   }
 
   render() {
-    if (this._imageData) this._canvas.getContext("2d").putImageData(this._imageData, 0, 0)
+    if (this._imageData) (this._canvas.getContext("2d") as CanvasRenderingContext2D).putImageData(this._imageData, 0, 0)
     return this
   }
 
@@ -132,13 +132,13 @@ export default class Layer {
 
   resize(width: number, height: number, options?: Options) {
     const temporaryCanvas = document.createElement("canvas"),
-      tempoaryContext = temporaryCanvas.getContext("2d")
+      tempoaryContext = temporaryCanvas.getContext("2d") as CanvasRenderingContext2D
     temporaryCanvas.width = width
     temporaryCanvas.height = height
     tempoaryContext.drawImage(this._canvas, 0, 0, width, height)
     this._canvas.width = width
     this._canvas.height = height
-    const context = this._canvas.getContext("2d")
+    const context = this._canvas.getContext("2d") as CanvasRenderingContext2D
     this._setImageSmoothing(context, options)
     context.drawImage(temporaryCanvas, 0, 0)
     this._imageData = context.getImageData(0, 0, width, height)
@@ -158,7 +158,7 @@ export default class Layer {
     return this
   }
 
-  computeEdgemap(options?: { background: number[]; foreground: number[] }) {
+  computeEdgemap(options: { background: number[]; foreground: number[] }) {
     const data = this._imageData.data,
       width = this._imageData.width,
       height = this._imageData.height,
