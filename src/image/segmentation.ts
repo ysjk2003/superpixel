@@ -8,12 +8,13 @@
  *
  * Copyright 2015  Kota Yamaguchi
  */
+import { SuperpixelOptions } from "../helper/segment-annotator"
 import PFF from "./segmentation/pff"
 import SLIC from "./segmentation/slic"
 import SLICO from "./segmentation/slico"
 import WatershedSegmentation from "./segmentation/watershed"
 
-export function createSegment(imageData, options) {
+export function createSegment(imageData: ImageData, options: SuperpixelOptions) {
   options = options || {}
   options.method = options.method || "slic"
   switch (options.method) {

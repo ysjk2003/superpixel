@@ -42,7 +42,7 @@ type Options = {
   grayscale?: boolean
 }
 
-type SuperpixelOptions = { method: string; regionSize: number; minRegionSize?: number; maxIterations?: number }
+export type SuperpixelOptions = { method: string; regionSize: number; minRegionSize?: number; maxIterations?: number }
 type AnnotatorLayers = { image: Layer; superpixel: Layer; visualization: Layer; annotation: Layer; boundary: Layer }
 type Update = { pixels: number[]; prev: number[]; next: number[] }
 
@@ -116,7 +116,7 @@ export default class Annotator {
     })
   }
 
-  resetSuperpixels(options?: SuperpixelOptions) {
+  resetSuperpixels(options: SuperpixelOptions) {
     this.layers.superpixel.copy(this.layers.image)
     this.segmentation = createSegment(this.layers.image.imageData, options)
     this._updateSuperpixels()
