@@ -42,7 +42,15 @@ type Options = {
   grayscale?: boolean
 }
 
-export type SuperpixelOptions = { method: string; regionSize: number; minRegionSize?: number; maxIterations?: number }
+export type SuperpixelOptions = {
+  method: string
+  regionSize: number
+  minRegionSize?: number
+  maxIterations?: number
+  sigma?: number
+  threshold?: number
+  minSize?: number
+}
 type AnnotatorLayers = { image: Layer; superpixel: Layer; visualization: Layer; annotation: Layer; boundary: Layer }
 type Update = { pixels: number[]; prev: number[]; next: number[] }
 

@@ -12,10 +12,10 @@ export class BaseSegmentation {
     this.imageData.data.set(imageData.data)
   }
 
-  finer() {
+  finer(scale) {
     throw new Error("makeNoise() must be implement.")
   }
-  coarser() {
+  coarser(scale) {
     throw new Error("makeNoise() must be implement.")
   }
 }

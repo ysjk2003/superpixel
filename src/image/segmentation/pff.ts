@@ -1,70 +1,93 @@
+import { SuperpixelOptions } from "../../helper/segment-annotator"
 import { createImageData } from "../compat"
 import { BaseSegmentation } from "./base"
 
+type Universe = {
+  nodes: any
+  rank: Int32Array
+  p: Int32Array
+  size: Int32Array
+  threshold: Float32Array
+}
+
+type Edge = {
+  a: Int32Array | Uint32Array
+  b: Int32Array | Uint32Array
+  w: Float32Array
+}
+
 export default class PFF extends BaseSegmentation {
-  constructor(imageData, options) {
+  private sigma: number
+  private threshold: number
+  private minSize: number
+  private _result: ImageData
+  private _numSegments!: number
+
+  get result() {
+    return this._result
+  }
+
+  get numSegments() {
+    return this._numSegments
+  }
+
+  constructor(imageData: ImageData, options: SuperpixelOptions) {
     super(imageData)
-    BaseSegmentation.call(this, imageData, options)
     options = options || {}
     this.sigma = options.sigma || Math.sqrt(2.0)
     this.threshold = options.threshold || 500
     this.minSize = options.minSize || 20
-    this.result = this._compute()
+    this._result = this._compute()
   }
 
   _compute() {
-    var smoothedImage = createImageData(this.imageData.width, this.imageData.height)
+    const smoothedImage = createImageData(this.imageData.width, this.imageData.height)
     smoothedImage.data.set(this.imageData.data)
     smoothImage(smoothedImage, this.sigma)
-    var universe = segmentGraph(smoothedImage, this.threshold, this.minSize),
+    const universe = segmentGraph(smoothedImage, this.threshold, this.minSize),
       indexMap = createIndexMap(universe, smoothedImage),
       result = createImageData(smoothedImage.width, smoothedImage.height)
     encodeLabels(indexMap, result.data)
-    result.numSegments = universe.nodes
+    this._numSegments = universe.nodes
     return result
   }
 
-  finer(scale) {
+  finer(scale?: number) {
     this.sigma /= scale || Math.sqrt(2)
     this.threshold /= scale || Math.sqrt(2)
-    this.result = this._compute()
+    this._result = this._compute()
   }
 
-  coarser(scale) {
+  coarser(scale?: number) {
     this.sigma *= scale || Math.sqrt(2.0)
     this.threshold *= scale || Math.sqrt(2.0)
-    this.result = this._compute()
+    this._result = this._compute()
   }
 }
 
 // Create a normalized Gaussian filter.
-function createGaussian(sigma) {
+function createGaussian(sigma: number) {
   sigma = Math.max(sigma, 0.01)
-  var length = Math.ceil(sigma * 4) + 1,
-    mask = new Float32Array(length),
-    sumValues = 0,
-    i
-  for (i = 0; i < length; ++i) {
-    var value = Math.exp(-0.5 * Math.pow(i / sigma, 2))
+  const length = Math.ceil(sigma * 4) + 1,
+    mask = new Float32Array(length)
+  let sumValues = 0
+  for (let i = 0; i < length; ++i) {
+    const value = Math.exp(-0.5 * Math.pow(i / sigma, 2))
     sumValues += Math.abs(value)
     mask[i] = value
   }
   sumValues = 2 * sumValues - Math.abs(mask[0]) // 2x except center.
-  for (i = 0; i < length; ++i) mask[i] /= sumValues
+  for (let i = 0; i < length; ++i) mask[i] /= sumValues
   return mask
 }
 
 // Convolve even.
-function convolveEven(imageData, filter) {
-  var width = imageData.width,
+function convolveEven(imageData: ImageData, filter: Float32Array) {
+  const width = imageData.width,
     height = imageData.height,
     source = imageData.data,
-    temporary = new Float32Array(source),
-    i,
-    j,
-    k,
-    l,
-    sum
+    temporary = new Float32Array(source)
+  let i, j, k, l, sum
   // Horizontal filter.
   for (i = 0; i < height; ++i) {
     for (j = 0; j < width; ++j) {
@@ -98,27 +121,27 @@ function convolveEven(imageData, filter) {
 }
 
 // Smooth an image.
-function smoothImage(imageData, sigma) {
-  var gaussian = createGaussian(sigma)
+function smoothImage(imageData: ImageData, sigma: number) {
+  const gaussian = createGaussian(sigma)
   convolveEven(imageData, gaussian)
 }
 
 // Create an edge structure.
-function createEdges(imageData) {
-  var width = imageData.width,
+function createEdges(imageData: ImageData) {
+  const width = imageData.width,
     height = imageData.height,
     rgbData = imageData.data,
     edgeSize = 4 * width * height - 3 * width - 3 * height + 2,
-    index = 0,
     edges = {
       a: new Int32Array(edgeSize),
       b: new Int32Array(edgeSize),
       w: new Float32Array(edgeSize),
-    },
+    }
+  let index = 0,
     x1,
     x2
-  for (var i = 0; i < height; ++i) {
-    for (var j = 0; j < width; ++j) {
+  for (let i = 0; i < height; ++i) {
+    for (let j = 0; j < width; ++j) {
       if (j < width - 1) {
         x1 = i * width + j
         x2 = i * width + j + 1
@@ -181,20 +204,19 @@ function createEdges(imageData) {
 }
 
 // Sort edges.
-function sortEdgesByWeights(edges) {
-  var order = new Array(edges.w.length),
-    i
-  for (i = 0; i < order.length; ++i) order[i] = i
-  var a = edges.a,
+function sortEdgesByWeights(edges: Edge) {
+  const order = new Array(edges.w.length)
+  for (let i = 0; i < order.length; ++i) order[i] = i
+  const a = edges.a,
     b = edges.b,
     w = edges.w
   order.sort(function (i, j) {
     return w[i] - w[j]
   })
-  var temporaryA = new Uint32Array(a),
+  const temporaryA = new Uint32Array(a),
     temporaryB = new Uint32Array(b),
     temporaryW = new Float32Array(w)
-  for (i = 0; i < order.length; ++i) {
+  for (let i = 0; i < order.length; ++i) {
     temporaryA[i] = a[order[i]]
     temporaryB[i] = b[order[i]]
     temporaryW[i] = w[order[i]]
@@ -205,15 +227,15 @@ function sortEdgesByWeights(edges) {
 }
 
 // Create a universe struct.
-function createUniverse(nodes, c) {
-  var universe = {
+function createUniverse(nodes: number, c: number) {
+  const universe = {
     nodes: nodes,
     rank: new Int32Array(nodes),
     p: new Int32Array(nodes),
     size: new Int32Array(nodes),
     threshold: new Float32Array(nodes),
   }
-  for (var i = 0; i < nodes; ++i) {
+  for (let i = 0; i < nodes; ++i) {
     universe.size[i] = 1
     universe.p[i] = i
     universe.threshold[i] = c
@@ -222,15 +244,15 @@ function createUniverse(nodes, c) {
 }
 
 // Find a vertex pointing self.
-function findNode(universe, index) {
-  var i = index
+function findNode(universe: Universe, index: number) {
+  let i = index
   while (i !== universe.p[i]) i = universe.p[i]
   universe.p[index] = i
   return i
 }
 
 // Join a node.
-function joinNode(universe, a, b) {
+function joinNode(universe: Universe, a: number, b: number) {
   if (universe.rank[a] > universe.rank[b]) {
     universe.p[b] = a
     universe.size[a] += universe.size[b]
@@ -243,13 +265,11 @@ function joinNode(universe, a, b) {
 }
 
 // Segment a graph.
-function segmentGraph(imageData, c, minSize) {
-  var edges = createEdges(imageData),
-    a,
-    b,
-    i
+function segmentGraph(imageData: ImageData, c: number, minSize: number) {
+  const edges = createEdges(imageData)
+  let a, b, i
   sortEdgesByWeights(edges)
-  var universe = createUniverse(imageData.width * imageData.height, c)
+  const universe = createUniverse(imageData.width * imageData.height, c)
   // Bottom-up merge.
   for (i = 0; i < edges.a.length; ++i) {
     a = findNode(universe, edges.a[i])
@@ -270,16 +290,16 @@ function segmentGraph(imageData, c, minSize) {
 }
 
 // Create an index map.
-function createIndexMap(universe, imageData) {
-  var width = imageData.width,
+function createIndexMap(universe: Universe, imageData: ImageData) {
+  const width = imageData.width,
     height = imageData.height,
     indexMap = new Int32Array(width * height),
-    nodeIds = [],
-    lastId = 0
-  for (var i = 0; i < height; ++i) {
-    for (var j = 0; j < width; ++j) {
-      var component = findNode(universe, i * width + j),
-        index = nodeIds[component]
+    nodeIds = []
+  let lastId = 0
+  for (let i = 0; i < height; ++i) {
+    for (let j = 0; j < width; ++j) {
+      const component = findNode(universe, i * width + j)
+      let index = nodeIds[component]
       if (index === undefined) {
         index = lastId
         nodeIds[component] = lastId++
@@ -290,9 +310,9 @@ function createIndexMap(universe, imageData) {
   return indexMap
 }
 
-function encodeLabels(indexMap, data) {
-  for (var i = 0; i < indexMap.length; ++i) {
-    var value = indexMap[i]
+function encodeLabels(indexMap: Int32Array, data: Uint8ClampedArray) {
+  for (let i = 0; i < indexMap.length; ++i) {
+    const value = indexMap[i]
     data[4 * i + 0] = value & 255
     data[4 * i + 1] = (value >>> 8) & 255
     data[4 * i + 2] = (value >>> 16) & 255
