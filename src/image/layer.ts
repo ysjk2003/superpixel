@@ -1,5 +1,3 @@
-import { Color } from "../main"
-
 /** Image canvas wrapper.
  *
  * Example:
