@@ -430,7 +430,7 @@ export default class Annotator {
       if (annotator.segmentation.result?.data) imageData.data.set(annotator.segmentation.result.data)
       // TODO:: separated result and numb segments
       //@ts-ignore
-      annotator._createPixelIndex(annotator.segmentation.result.numSegments)
+      annotator._createPixelIndex(annotator.segmentation.numSegments)
       annotator._updateBoundaryLayer()
       this.setAlpha(0).render()
     })

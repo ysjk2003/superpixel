@@ -1,8 +1,23 @@
+import { SuperpixelOptions } from "../../helper/segment-annotator"
 import { createImageData } from "../compat"
 import { BaseSegmentation } from "./base"
 
 export default class SLIC extends BaseSegmentation {
-  constructor(imageData, options) {
+  private regionSize: number
+  private minRegionSize: number
+  private maxIterations: number
+  private _result!: ImageData
+  private _numSegments: number = 0
+
+  get result() {
+    return this._result
+  }
+
+  get numSegments() {
+    return this._numSegments
+  }
+
+  constructor(imageData: ImageData, options: SuperpixelOptions) {
     super(imageData)
     options = options || {}
     this.regionSize = options.regionSize || 16
@@ -12,7 +27,7 @@ export default class SLIC extends BaseSegmentation {
   }
 
   finer() {
-    var newSize = Math.max(5, Math.round(this.regionSize / Math.sqrt(2.0)))
+    const newSize = Math.max(5, Math.round(this.regionSize / Math.sqrt(2.0)))
     if (newSize !== this.regionSize) {
       this.regionSize = newSize
       this.minRegionSize = Math.round(newSize * 0.8)
@@ -21,7 +36,7 @@ export default class SLIC extends BaseSegmentation {
   }
 
   coarser() {
-    var newSize = Math.min(640, Math.round(this.regionSize * Math.sqrt(2.0)))
+    const newSize = Math.min(640, Math.round(this.regionSize * Math.sqrt(2.0)))
     if (newSize !== this.regionSize) {
       this.regionSize = newSize
       this.minRegionSize = Math.round(newSize * 0.8)
@@ -30,16 +45,16 @@ export default class SLIC extends BaseSegmentation {
   }
 
   _compute() {
-    this.result = this.computeSLICSegmentation(this.imageData, this.regionSize, this.minRegionSize, this.maxIterations)
+    this._result = this.computeSLICSegmentation(this.imageData, this.regionSize, this.minRegionSize, this.maxIterations)
   }
 
   // Convert RGBA into XYZ color space. rgba: Red Green Blue Alpha.
-  rgb2xyz(rgba, w, h) {
-    var xyz = new Float32Array(3 * w * h),
+  rgb2xyz(rgba: Uint8ClampedArray, w: number, h: number) {
+    const xyz = new Float32Array(3 * w * h),
       gamma = 2.2
-    for (var i = 0; i < w * h; i++) {
+    for (let i = 0; i < w * h; i++) {
       // 1.0 / 255.9 = 0.00392156862.
-      var r = rgba[4 * i + 0] * 0.00392156862,
+      let r = rgba[4 * i + 0] * 0.00392156862,
         g = rgba[4 * i + 1] * 0.00392156862,
         b = rgba[4 * i + 2] * 0.00392156862
       r = Math.pow(r, gamma)
@@ -53,12 +68,12 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Convert XYZ to Lab.
-  xyz2lab(xyz, w, h) {
-    function f(x) {
+  xyz2lab(xyz: Float32Array, w: number, h: number) {
+    function f(x: number) {
       if (x > 0.00856) return Math.pow(x, 0.33333333)
       else return 7.78706891568 * x + 0.1379310336
     }
-    var xw = 1.0 / 3.0,
+    const xw = 1.0 / 3.0,
       yw = 1.0 / 3.0,
       Yw = 1.0,
       Xw = xw / yw,
@@ -67,8 +82,8 @@ export default class SLIC extends BaseSegmentation {
       iy = 1.0 / Yw,
       iz = 1.0 / Zw,
       labData = new Float32Array(3 * w * h)
-    for (var i = 0; i < w * h; i++) {
-      var fx = f(xyz[i] * ix),
+    for (let i = 0; i < w * h; i++) {
+      const fx = f(xyz[i] * ix),
         fy = f(xyz[w * h + i] * iy),
         fz = f(xyz[2 * w * h + i] * iz)
       labData[i] = 116.0 * fy - 16.0
@@ -79,11 +94,11 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Compute gradient of 3 channel color space image.
-  computeEdge(image, edgeMap, w, h) {
-    for (var k = 0; k < 3; k++) {
-      for (var y = 1; y < h - 1; y++) {
-        for (var x = 1; x < w - 1; x++) {
-          var a = image[k * w * h + y * w + x - 1],
+  computeEdge(image: Float32Array, edgeMap: Float32Array, w: number, h: number) {
+    for (let k = 0; k < 3; k++) {
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const a = image[k * w * h + y * w + x - 1],
             b = image[k * w * h + y * w + x + 1],
             c = image[k * w * h + (y + 1) * w + x],
             d = image[k * w * h + (y - 1) * w + x]
@@ -94,26 +109,34 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Initialize superpixel clusters.
-  initializeKmeansCenters(image, edgeMap, centers, clusterParams, numRegionsX, numRegionsY, regionSize, imW, imH) {
-    var i = 0,
+  initializeKmeansCenters(
+    image: Float32Array,
+    edgeMap: Float32Array,
+    centers: Float32Array,
+    clusterParams: Float32Array,
+    numRegionsX: number,
+    numRegionsY: number,
+    regionSize: number,
+    imW: number,
+    imH: number,
+  ) {
+    let i = 0,
       j = 0,
       x,
       y
-    for (var v = 0; v < numRegionsY; v++) {
-      for (var u = 0; u < numRegionsX; u++) {
-        var centerx = 0,
+    for (let v = 0; v < numRegionsY; v++) {
+      for (let u = 0; u < numRegionsX; u++) {
+        let centerx = 0,
           centery = 0,
-          minEdgeValue = Infinity,
-          xp,
-          yp
-        x = parseInt(Math.round(regionSize * (u + 0.5)), 10)
-        y = parseInt(Math.round(regionSize * (v + 0.5)), 10)
+          minEdgeValue = Infinity
+        let x = Math.floor(Math.round(regionSize * (u + 0.5)))
+        y = Math.floor(Math.round(regionSize * (v + 0.5)))
         x = Math.max(Math.min(x, imW - 1), 0)
         y = Math.max(Math.min(y, imH - 1), 0)
         // Search in a 3x3 neighbourhood the smallest edge response.
-        for (yp = Math.max(0, y - 1); yp <= Math.min(imH - 1, y + 1); ++yp) {
-          for (xp = Math.max(0, x - 1); xp <= Math.min(imW - 1, x + 1); ++xp) {
-            var thisEdgeValue = edgeMap[yp * imW + xp]
+        for (let yp = Math.max(0, y - 1); yp <= Math.min(imH - 1, y + 1); ++yp) {
+          for (let xp = Math.max(0, x - 1); xp <= Math.min(imW - 1, x + 1); ++xp) {
+            const thisEdgeValue = edgeMap[yp * imW + xp]
             if (thisEdgeValue < minEdgeValue) {
               minEdgeValue = thisEdgeValue
               centerx = xp
@@ -123,8 +146,8 @@ export default class SLIC extends BaseSegmentation {
         }
 
         // Initialize the new center at this location.
-        centers[i++] = parseFloat(centerx)
-        centers[i++] = parseFloat(centery)
+        centers[i++] = centerx
+        centers[i++] = centery
         // 3 channels.
         centers[i++] = image[centery * imW + centerx]
         centers[i++] = image[imW * imH + centery * imW + centerx]
@@ -137,10 +160,18 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Re-compute clusters.
-  computeCenters(image, segmentation, masses, centers, numRegions, imW, imH) {
-    var region
-    for (var y = 0; y < imH; y++) {
-      for (var x = 0; x < imW; x++) {
+  computeCenters(
+    image: Float32Array,
+    segmentation: Int32Array,
+    masses: number[],
+    centers: Float32Array,
+    numRegions: number,
+    imW: number,
+    imH: number,
+  ) {
+    let region
+    for (let y = 0; y < imH; y++) {
+      for (let x = 0; x < imW; x++) {
         region = segmentation[x + y * imW]
         masses[region]++
         centers[region * 5 + 0] += x
@@ -151,7 +182,7 @@ export default class SLIC extends BaseSegmentation {
       }
     }
     for (region = 0; region < numRegions; region++) {
-      var iMass = 1.0 / Math.max(masses[region], 1e-8)
+      const iMass = 1.0 / Math.max(masses[region], 1e-8)
       centers[region * 5] = centers[region * 5] * iMass
       centers[region * 5 + 1] = centers[region * 5 + 1] * iMass
       centers[region * 5 + 2] = centers[region * 5 + 2] * iMass
@@ -161,22 +192,12 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Remove small superpixels and assign them the nearest superpixel label.
-  eliminateSmallRegions(segmentation, minRegionSize, numPixels, imW, imH) {
-    var cleaned = new Int32Array(numPixels),
+  eliminateSmallRegions(segmentation: Int32Array, minRegionSize: number, numPixels: number, imW: number, imH: number) {
+    const cleaned = new Int32Array(numPixels),
       segment = new Int32Array(numPixels),
       dx = new Array(1, -1, 0, 0),
-      dy = new Array(0, 0, 1, -1),
-      segmentSize,
-      label,
-      cleanedLabel,
-      numExpanded,
-      pixel,
-      x,
-      y,
-      xp,
-      yp,
-      neighbor,
-      direction
+      dy = new Array(0, 0, 1, -1)
+    let segmentSize, label, cleanedLabel, numExpanded, pixel, x, y, xp, yp, neighbor, direction
     for (pixel = 0; pixel < numPixels; ++pixel) {
       if (cleaned[pixel]) continue
       label = segmentation[pixel]
@@ -198,7 +219,7 @@ export default class SLIC extends BaseSegmentation {
       }
       // Expand the segment.
       while (numExpanded < segmentSize) {
-        var open = segment[numExpanded++]
+        const open = segment[numExpanded++]
         x = open % imW
         y = Math.floor(open / imW)
         for (direction = 0; direction < 4; ++direction) {
@@ -226,15 +247,15 @@ export default class SLIC extends BaseSegmentation {
     }
     // Restore base 0 indexing of the regions.
     for (pixel = 0; pixel < numPixels; ++pixel) --cleaned[pixel]
-    for (var i = 0; i < numPixels; ++i) segmentation[i] = cleaned[i]
+    for (let i = 0; i < numPixels; ++i) segmentation[i] = cleaned[i]
   }
 
   // Update cluster parameters.
-  updateClusterParams(segmentation, mcMap, msMap, clusterParams) {
-    var mc = new Float32Array(clusterParams.length / 2),
+  updateClusterParams(segmentation: Int32Array, mcMap: Float32Array, msMap: Float32Array, clusterParams: Float32Array) {
+    const mc = new Float32Array(clusterParams.length / 2),
       ms = new Float32Array(clusterParams.length / 2)
-    for (var i = 0; i < segmentation.length; i++) {
-      var region = segmentation[i]
+    for (let i = 0; i < segmentation.length; i++) {
+      const region = segmentation[i]
       if (mc[region] < mcMap[region]) {
         mc[region] = mcMap[region]
         clusterParams[region * 2 + 0] = mcMap[region]
@@ -248,28 +269,28 @@ export default class SLIC extends BaseSegmentation {
 
   // Assign superpixel label.
   assignSuperpixelLabel(
-    im,
-    segmentation,
-    mcMap,
-    msMap,
-    distanceMap,
-    centers,
-    clusterParams,
-    numRegionsX,
-    numRegionsY,
-    regionSize,
-    imW,
-    imH,
+    im: Float32Array,
+    segmentation: Int32Array,
+    mcMap: Float32Array,
+    msMap: Float32Array,
+    distanceMap: Float32Array,
+    centers: Float32Array,
+    clusterParams: Float32Array,
+    numRegionsX: number,
+    numRegionsY: number,
+    regionSize: number,
+    imW: number,
+    imH: number,
   ) {
-    var x, y
-    for (var i = 0; i < distanceMap.length; ++i) distanceMap[i] = Infinity
-    var S = regionSize
-    for (var region = 0; region < numRegionsX * numRegionsY; ++region) {
-      var cx = Math.round(centers[region * 5 + 0]),
+    let x, y
+    for (let i = 0; i < distanceMap.length; ++i) distanceMap[i] = Infinity
+    const S = regionSize
+    for (let region = 0; region < numRegionsX * numRegionsY; ++region) {
+      const cx = Math.round(centers[region * 5 + 0]),
         cy = Math.round(centers[region * 5 + 1])
       for (y = Math.max(0, cy - S); y < Math.min(imH, cy + S); ++y) {
         for (x = Math.max(0, cx - S); x < Math.min(imW, cx + S); ++x) {
-          var spatial = (x - cx) * (x - cx) + (y - cy) * (y - cy),
+          const spatial = (x - cx) * (x - cx) + (y - cy) * (y - cy),
             dR = im[y * imW + x] - centers[5 * region + 2],
             dG = im[imW * imH + y * imW + x] - centers[5 * region + 3],
             dB = im[2 * imW * imH + y * imW + x] - centers[5 * region + 4],
@@ -294,21 +315,21 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // ...
-  computeResidualError(prevCenters, currentCenters) {
-    var error = 0.0
-    for (var i = 0; i < prevCenters.length; ++i) {
-      var d = prevCenters[i] - currentCenters[i]
+  computeResidualError(prevCenters: Float32Array, currentCenters: Float32Array) {
+    let error = 0.0
+    for (let i = 0; i < prevCenters.length; ++i) {
+      const d = prevCenters[i] - currentCenters[i]
       error += Math.sqrt(d * d)
     }
     return error
   }
 
   // Remap label indices.
-  remapLabels(segmentation) {
-    var map = {},
-      index = 0
-    for (var i = 0; i < segmentation.length; ++i) {
-      var label = segmentation[i]
+  remapLabels(segmentation: Int32Array) {
+    const map: { [key: number]: number } = {}
+    let index = 0
+    for (let i = 0; i < segmentation.length; ++i) {
+      const label = segmentation[i]
       if (map[label] === undefined) map[label] = index++
       segmentation[i] = map[label]
     }
@@ -316,9 +337,9 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Encode labels in RGB.
-  encodeLabels(segmentation, data) {
-    for (var i = 0; i < segmentation.length; ++i) {
-      var value = Math.floor(segmentation[i])
+  encodeLabels(segmentation: Int32Array, data: Uint8ClampedArray) {
+    for (let i = 0; i < segmentation.length; ++i) {
+      const value = Math.floor(segmentation[i])
       data[4 * i + 0] = value & 255
       data[4 * i + 1] = (value >>> 8) & 255
       data[4 * i + 2] = (value >>> 16) & 255
@@ -327,9 +348,8 @@ export default class SLIC extends BaseSegmentation {
   }
 
   // Compute SLIC Segmentation.
-  computeSLICSegmentation(imageData, regionSize, minRegionSize, maxIterations) {
-    var i,
-      imWidth = imageData.width,
+  computeSLICSegmentation(imageData: ImageData, regionSize: number, minRegionSize: number, maxIterations: number) {
+    const imWidth = imageData.width,
       imHeight = imageData.height,
       numRegionsX = Math.floor(imWidth / regionSize),
       numRegionsY = Math.floor(imHeight / regionSize),
@@ -360,11 +380,11 @@ export default class SLIC extends BaseSegmentation {
       imWidth,
       imHeight,
     )
-    var segmentation = new Int32Array(numPixels)
+    const segmentation = new Int32Array(numPixels)
     /** SLICO implementation: "SLIC Superpixels Compared to State-of-the-art
      * Superpixel Methods"
      */
-    for (var iter = 0; iter < maxIterations; ++iter) {
+    for (let iter = 0; iter < maxIterations; ++iter) {
       // Do assignment.
       this.assignSuperpixelLabel(
         labData,
@@ -383,18 +403,18 @@ export default class SLIC extends BaseSegmentation {
       // Update maximum spatial and color distances [1].
       this.updateClusterParams(segmentation, mcMap, msMap, clusterParams)
       // Compute new centers.
-      for (i = 0; i < masses.length; ++i) masses[i] = 0
-      for (i = 0; i < newCenters.length; ++i) newCenters[i] = 0
+      for (let i = 0; i < masses.length; ++i) masses[i] = 0
+      for (let i = 0; i < newCenters.length; ++i) newCenters[i] = 0
       this.computeCenters(labData, segmentation, masses, newCenters, numRegions, imWidth, imHeight)
       // Compute residual error of assignment.
-      var error = this.computeResidualError(currentCenters, newCenters)
+      const error = this.computeResidualError(currentCenters, newCenters)
       if (error < 1e-5) break
-      for (i = 0; i < currentCenters.length; ++i) currentCenters[i] = newCenters[i]
+      for (let i = 0; i < currentCenters.length; ++i) currentCenters[i] = newCenters[i]
     }
     this.eliminateSmallRegions(segmentation, minRegionSize, numPixels, imWidth, imHeight)
     // Refresh the canvas.
-    var result = createImageData(imWidth, imHeight)
-    result.numSegments = this.remapLabels(segmentation)
+    const result = createImageData(imWidth, imHeight)
+    this._numSegments = this.remapLabels(segmentation)
     this.encodeLabels(segmentation, result.data)
     return result
   }
