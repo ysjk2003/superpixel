@@ -50,6 +50,10 @@ export type SuperpixelOptions = {
   sigma?: number
   threshold?: number
   minSize?: number
+  K?: number
+  perturb?: boolean
+  step?: number
+  enforceConnectivity?: boolean
 }
 type AnnotatorLayers = { image: Layer; superpixel: Layer; visualization: Layer; annotation: Layer; boundary: Layer }
 type Update = { pixels: number[]; prev: number[]; next: number[] }
