@@ -1,43 +1,53 @@
-export default class BinaryHeapPriorityQueue {
-  constructor(options) {
-    options = options || {}
+type Comparator<T> = (a: T, b: T) => number
+
+interface BinaryHeapPriorityQueueOptions<T> {
+  comparator?: Comparator<T>
+  initialValues?: T[]
+}
+
+export default class BinaryHeapPriorityQueue<T = number> {
+  private comparator: Comparator<T>
+  private data: T[]
+  public length: number
+
+  constructor(options: BinaryHeapPriorityQueueOptions<T> = {}) {
     this.comparator =
       options.comparator ||
-      function (a, b) {
-        return a - b
-      }
+      ((a: any, b: any) => a - b)
     this.data = options.initialValues ? options.initialValues.slice(0) : []
     this.length = this.data.length
-    if (this.data.length > 0) for (var i = 1; i <= this.data.length; ++i) this._bubbleUp(i)
+    if (this.data.length > 0) {
+      for (let i = 1; i <= this.data.length; ++i) this._bubbleUp(i)
+    }
   }
 
-  push(value) {
+  push(value: T): this {
     this.data.push(value)
     this.length = this.data.length
     this._bubbleUp(this.data.length - 1)
     return this
   }
 
-  shift() {
-    var value = this.data[0],
-      last = this.data.pop()
+  shift(): T | undefined {
+    const value = this.data[0]
+    const last = this.data.pop()
     this.length = this.data.length
-    if (this.length > 0) {
+    if (this.length > 0 && last !== undefined) {
       this.data[0] = last
       this._bubbleDown(0)
     }
     return value
   }
 
-  peek() {
+  peek(): T | undefined {
     return this.data[0]
   }
 
-  _bubbleUp(i) {
+  private _bubbleUp(i: number): void {
     while (i > 0) {
-      var parent = (i - 1) >>> 1
+      const parent = (i - 1) >>> 1
       if (this.comparator(this.data[i], this.data[parent]) < 0) {
-        var value = this.data[parent]
+        const value = this.data[parent]
         this.data[parent] = this.data[i]
         this.data[i] = value
         i = parent
@@ -45,16 +55,16 @@ export default class BinaryHeapPriorityQueue {
     }
   }
 
-  _bubbleDown(i) {
-    var last = this.data.length - 1
+  private _bubbleDown(i: number): void {
+    const last = this.data.length - 1
     while (true) {
-      var left = (i << 1) + 1,
-        right = left + 1,
-        minIndex = i
+      const left = (i << 1) + 1,
+        right = left + 1
+      let minIndex = i
       if (left <= last && this.comparator(this.data[left], this.data[minIndex]) < 0) minIndex = left
       if (right <= last && this.comparator(this.data[right], this.data[minIndex]) < 0) minIndex = right
       if (minIndex !== i) {
-        var value = this.data[minIndex]
+        const value = this.data[minIndex]
         this.data[minIndex] = this.data[i]
         this.data[i] = value
         i = minIndex

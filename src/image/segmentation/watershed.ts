@@ -12,14 +12,37 @@
  *
  */
 import { canny } from "../canny"
-import { distanceTransform } from "../distance-transform"
+import { distanceTransform, Edge } from "../distance-transform"
 import { BaseSegmentation } from "./base"
 import BinaryHeapPriorityQueue from "./binary-heap-priority-queue"
 // Constructor for the segmentation configuration.
 export default class WatershedSegmentation extends BaseSegmentation {
-  constructor(imageData, options) {
+  private sigmaRange: number[]
+  private kernelRange: number[]
+  private currentConfig: number
+  private minRegionSize: number
+  private highThreshold: number
+  private lowThreshold: number
+  private neighborMap8: NeighborMap
+  private neighborMap4: NeighborMap
+  private result:
+    | (ImageData & {
+        numSegments?: number
+      })
+    | undefined
+
+  constructor(
+    imageData: ImageData,
+    options?: {
+      kernelRange?: number[]
+      sigmaRange?: number[]
+      currentConfig?: number
+      minRegionSize?: number
+      highThreshold?: number
+      lowThreshold?: number
+    },
+  ) {
     super(imageData)
-    BaseSegmentation.call(this, imageData, options)
     options = options || {}
     this.sigmaRange =
       options.sigmaRange ||
@@ -30,7 +53,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     this.currentConfig = options.currentConfig || Math.floor((this.sigmaRange.length - 1) / 2)
     this.minRegionSize = options.minRegionSize || 16
     this.highThreshold = options.highThreshold || 0.04
-    this.lowThreshold = options.lowThreshold || 0.3 * options.highThreshold
+    this.lowThreshold = options.lowThreshold || 0.3 * this.highThreshold
     if (this.sigmaRange.length <= 0) throw "Invalid sigma range"
     this.neighborMap8 = new NeighborMap(this.imageData.width, this.imageData.height)
     this.neighborMap4 = new NeighborMap(this.imageData.width, this.imageData.height, [
@@ -57,20 +80,20 @@ export default class WatershedSegmentation extends BaseSegmentation {
   }
 
   _compute() {
-    var queue = new BinaryHeapPriorityQueue({
-      comparator: function (a, b) {
+    const queue = new BinaryHeapPriorityQueue<number[]>({
+      comparator: function (a: number[], b: number[]) {
         return a[0] - b[0]
       },
     })
-    var edge = canny(this.imageData, {
+    const edge = canny(this.imageData, {
       kernelTail: this.kernelRange[this.currentConfig],
       sigma: this.sigmaRange[this.currentConfig],
       lowThreshold: this.lowThreshold,
       highThreshold: this.highThreshold,
     })
-    var seeds = this._findLocalMaxima(distanceTransform(edge))
-    var labels = new Int32Array(edge.data.length)
-    var i, j, offset, neighbors, neighborOffset
+    const seeds = this._findLocalMaxima(distanceTransform(edge))
+    const labels = new Int32Array(edge.data.length)
+    let i, j, offset, neighbors, neighborOffset
     // Initialize.
     for (i = 0; i < labels.length; ++i) labels[i] = -1
     for (i = 0; i < seeds.length; ++i) labels[seeds[i]] = i + 1
@@ -85,11 +108,11 @@ export default class WatershedSegmentation extends BaseSegmentation {
       }
     }
     // Iterate until we label all pixels by non-border dilation.
-    var iter = 0
+    let iter = 0
     while (queue.length > 0) {
-      offset = queue.shift()[1]
+      offset = queue.shift()![1]
       neighbors = this.neighborMap8.get(offset)
-      var uniqueLabel = this._findUniqueRegionLabel(neighbors, labels)
+      const uniqueLabel = this._findUniqueRegionLabel(neighbors, labels)
       if (uniqueLabel) {
         // Dilate when there is a unique region label.
         labels[offset] = uniqueLabel
@@ -106,59 +129,56 @@ export default class WatershedSegmentation extends BaseSegmentation {
     // Remove boundaries and small regions.
     this.erode(0, labels)
     this._removeSmallRegions(labels)
-    var numSegments = this._relabel(labels)
+    const numSegments = this._relabel(labels)
     this.result = this._encodeLabels(labels)
     this.result.numSegments = numSegments
   }
 
-  _findLocalMaxima(intensity) {
-    var data = intensity.data,
-      maximaMap = new Uint8Array(data.length),
-      offsets = [],
-      k,
-      offset,
-      neighbors,
-      flag
-    for (offset = 0; offset < data.length; ++offset) {
-      neighbors = this.neighborMap8.get(offset)
-      flag = true
-      for (k = 0; k < neighbors.length; ++k) flag = flag && data[offset] >= data[neighbors[k]]
-      maximaMap[offset] = flag
+  _findLocalMaxima(intensity: Edge) {
+    const data = intensity.data
+    const maximaMap = new Uint8Array(data.length)
+    const offsets = []
+
+    for (let offset = 0; offset < data.length; ++offset) {
+      const neighbors = this.neighborMap8.get(offset)
+      let flag = true
+      for (let k = 0; k < neighbors.length; ++k) flag = flag && data[offset] >= data[neighbors[k]]
+      maximaMap[offset] = Number(flag)
     }
     // Erase connected seeds.
-    var suppressed = new Uint8Array(maximaMap.length)
-    for (offset = 0; offset < data.length; ++offset) {
-      neighbors = this.neighborMap4.get(offset)
-      flag = true
-      for (k = 0; k < neighbors.length; ++k) flag = flag && maximaMap[offset] > maximaMap[neighbors[k]]
-      suppressed[offset] = flag
+    const suppressed = new Uint8Array(maximaMap.length)
+    for (let offset = 0; offset < data.length; ++offset) {
+      const neighbors = this.neighborMap4.get(offset)
+      let flag = true
+      for (let k = 0; k < neighbors.length; ++k) flag = flag && maximaMap[offset] > maximaMap[neighbors[k]]
+      suppressed[offset] = Number(flag)
     }
-    for (offset = 0; offset < suppressed.length; ++offset) if (suppressed[offset]) offsets.push(offset)
+    for (let offset = 0; offset < suppressed.length; ++offset) if (suppressed[offset]) offsets.push(offset)
     return offsets
   }
 
-  _findUniqueRegionLabel(neighbors, labels) {
-    var uniqueLabels = []
-    for (var i = 0; i < neighbors.length; ++i) {
-      var label = labels[neighbors[i]]
+  _findUniqueRegionLabel(neighbors: number[], labels: Int32Array<ArrayBuffer>) {
+    const uniqueLabels = []
+    for (let i = 0; i < neighbors.length; ++i) {
+      const label = labels[neighbors[i]]
       if (label > 0 && uniqueLabels.indexOf(label) < 0) uniqueLabels.push(label)
     }
     return uniqueLabels.length === 1 ? uniqueLabels[0] : null
   }
 
-  _findDominantLabel(neighbors, labels, target) {
-    var histogram = {},
-      label
-    for (var i = 0; i < neighbors.length; ++i) {
-      label = labels[neighbors[i]]
+  _findDominantLabel(neighbors: number[], labels: Int32Array<ArrayBuffer>, target: number) {
+    const histogram: { [key: number]: number } = {}
+
+    for (let i = 0; i < neighbors.length; ++i) {
+      const label = labels[neighbors[i]]
       if (label !== target) {
         if (histogram[label]) ++histogram[label]
         else histogram[label] = 1
       }
     }
-    var count = 0,
+    let count = 0,
       dominantLabel = null
-    for (label in histogram) {
+    for (const label in histogram) {
       if (histogram[label] > count) {
         dominantLabel = label
         count = histogram[label]
@@ -167,20 +187,20 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return dominantLabel
   }
 
-  erode(target, labels) {
-    var offsets = [],
-      updates = {},
-      offset
-    for (offset = 0; offset < labels.length; ++offset) if (labels[offset] === target) offsets.push(offset)
+  erode(target: number, labels: Int32Array<ArrayBuffer>) {
+    const offsets: number[] = []
+    const updates: { [key: number | string]: number } = {}
+
+    for (let offset = 0; offset < labels.length; ++offset) if (labels[offset] === target) offsets.push(offset)
     if (target !== 0 && offsets.length === 0) throw "No pixels for label " + target
     updates[target] = 0
-    var iter = 0
+    let iter = 0
     while (offsets.length > 0) {
-      offset = offsets.shift()
-      var neighbors = this.neighborMap8.get(offset),
-        dominantLabel = this._findDominantLabel(neighbors, labels, target)
+      const offset = offsets.shift()!
+      const neighbors = this.neighborMap8.get(offset)
+      const dominantLabel = this._findDominantLabel(neighbors, labels, target)
       if (dominantLabel !== null) {
-        labels[offset] = dominantLabel
+        labels[offset] = Number(dominantLabel)
         if (updates[dominantLabel]) ++updates[dominantLabel]
         else updates[dominantLabel] = 1
         --updates[target]
@@ -190,10 +210,10 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return updates
   }
 
-  _findSmallLabel(histogram) {
-    var smallLabel = null
-    for (var label in histogram) {
-      var count = histogram[label]
+  _findSmallLabel(histogram: { [key: number]: number }) {
+    let smallLabel = null
+    for (const label in histogram) {
+      const count = histogram[label]
       if (0 < count && count < this.minRegionSize) {
         smallLabel = parseInt(label, 10)
         break
@@ -202,31 +222,29 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return smallLabel
   }
 
-  _removeSmallRegions(labels) {
-    var histogram = {},
-      offset,
-      label,
-      updates
-    for (offset = 0; offset < labels.length; ++offset) {
-      label = labels[offset]
+  _removeSmallRegions(labels: Int32Array<ArrayBuffer>) {
+    const histogram: { [key: number | string]: number } = {}
+
+    for (let offset = 0; offset < labels.length; ++offset) {
+      const label = labels[offset]
       if (histogram[label]) ++histogram[label]
       else histogram[label] = 1
     }
-    var iter = 0
+    let iter = 0
     while (true) {
-      var smallLabel = this._findSmallLabel(histogram)
+      const smallLabel = this._findSmallLabel(histogram)
       if (smallLabel !== null) {
-        updates = this.erode(smallLabel, labels)
-        for (label in updates) histogram[label] += updates[label]
+        const updates = this.erode(smallLabel, labels)
+        for (const label in updates) histogram[label] += updates[label]
       } else break
       if (++iter >= Object.keys(histogram).length) throw "Too many iterations"
     }
   }
 
-  _relabel(labels) {
-    var uniqueArray = []
-    for (var i = 0; i < labels.length; ++i) {
-      var index = uniqueArray.indexOf(labels[i])
+  _relabel(labels: Int32Array<ArrayBuffer>) {
+    const uniqueArray = []
+    for (let i = 0; i < labels.length; ++i) {
+      let index = uniqueArray.indexOf(labels[i])
       if (index < 0) {
         index = uniqueArray.length
         uniqueArray.push(labels[i])
@@ -236,11 +254,11 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return uniqueArray.length
   }
 
-  _encodeLabels(labels) {
-    var imageData = new ImageData(this.imageData.width, this.imageData.height),
+  _encodeLabels(labels: Int32Array<ArrayBuffer>) {
+    const imageData = new ImageData(this.imageData.width, this.imageData.height),
       data = imageData.data
-    for (var i = 0; i < labels.length; ++i) {
-      var value = labels[i]
+    for (let i = 0; i < labels.length; ++i) {
+      const value = labels[i]
       data[4 * i] = 255 & value
       data[4 * i + 1] = 255 & (value >> 8)
       data[4 * i + 2] = 255 & (value >> 16)
@@ -252,7 +270,10 @@ export default class WatershedSegmentation extends BaseSegmentation {
 
 // Neighbor Map.
 class NeighborMap {
-  constructor(width, height, neighbors) {
+  private neighbors: number[][]
+  private maps: Int32Array[]
+
+  constructor(width: number, height: number, neighbors?: number[][]) {
     this.neighbors = neighbors || [
       [-1, -1],
       [-1, 0],
@@ -264,13 +285,13 @@ class NeighborMap {
       [1, 1],
     ]
     this.maps = []
-    for (var k = 0; k < this.neighbors.length; ++k) {
-      var dy = this.neighbors[k][0],
+    for (let k = 0; k < this.neighbors.length; ++k) {
+      const dy = this.neighbors[k][0],
         dx = this.neighbors[k][1],
         map = new Int32Array(width * height)
-      for (var y = 0; y < height; ++y) {
-        for (var x = 0; x < width; ++x) {
-          var Y = y + dy,
+      for (let y = 0; y < height; ++y) {
+        for (let x = 0; x < width; ++x) {
+          const Y = y + dy,
             X = x + dx
           map[y * width + x] = Y < 0 || height <= Y || X < 0 || width <= X ? -1 : Y * width + X
         }
@@ -279,10 +300,10 @@ class NeighborMap {
     }
   }
 
-  get(offset) {
-    var neighborOffsets = []
-    for (var k = 0; k < this.neighbors.length; ++k) {
-      var neighborOffset = this.maps[k][offset]
+  get(offset: number) {
+    const neighborOffsets = []
+    for (let k = 0; k < this.neighbors.length; ++k) {
+      const neighborOffset = this.maps[k][offset]
       if (neighborOffset >= 0) neighborOffsets.push(neighborOffset)
     }
     return neighborOffsets

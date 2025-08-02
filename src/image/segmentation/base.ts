@@ -6,16 +6,18 @@
 import { createImageData } from "../compat"
 
 export class BaseSegmentation {
-  constructor(imageData) {
+  protected imageData: ImageData
+
+  constructor(imageData: ImageData) {
     if (!(imageData instanceof ImageData)) throw "Invaild ImageData"
     this.imageData = createImageData(imageData.width, imageData.height)
     this.imageData.data.set(imageData.data)
   }
 
-  finer(scale) {
+  finer(scale?: number) {
     throw new Error("makeNoise() must be implement.")
   }
-  coarser(scale) {
+  coarser(scale?: number) {
     throw new Error("makeNoise() must be implement.")
   }
 }
