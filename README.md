@@ -16,7 +16,7 @@ npm install superpixel
 ```
 
 ```js
-import SLIC from "superpixel/src/image/segmentation/slic"
+import { SLIC } from "superpixel"
 
 const imageData = new ImageData() //Image data for which you want to know the result value of superpixel
 const slic = new SLIC(imageData)
