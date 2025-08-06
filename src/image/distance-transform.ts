@@ -11,7 +11,7 @@ const INF = 1e20
 export type Edge = {
   width: number
   height: number
-  data: Float32Array<ArrayBuffer>
+  data: Float32Array
 }
 
 function distanceTransform1D(f: Float32Array, n: number) {

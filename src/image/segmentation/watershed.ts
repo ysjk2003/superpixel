@@ -25,7 +25,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
   private lowThreshold: number
   private neighborMap8: NeighborMap
   private neighborMap4: NeighborMap
-  private result:
+  public result:
     | (ImageData & {
         numSegments?: number
       })
@@ -157,7 +157,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return offsets
   }
 
-  _findUniqueRegionLabel(neighbors: number[], labels: Int32Array<ArrayBuffer>) {
+  _findUniqueRegionLabel(neighbors: number[], labels: Int32Array) {
     const uniqueLabels = []
     for (let i = 0; i < neighbors.length; ++i) {
       const label = labels[neighbors[i]]
@@ -166,7 +166,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return uniqueLabels.length === 1 ? uniqueLabels[0] : null
   }
 
-  _findDominantLabel(neighbors: number[], labels: Int32Array<ArrayBuffer>, target: number) {
+  _findDominantLabel(neighbors: number[], labels: Int32Array, target: number) {
     const histogram: { [key: number]: number } = {}
 
     for (let i = 0; i < neighbors.length; ++i) {
@@ -187,7 +187,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return dominantLabel
   }
 
-  erode(target: number, labels: Int32Array<ArrayBuffer>) {
+  erode(target: number, labels: Int32Array) {
     const offsets: number[] = []
     const updates: { [key: number | string]: number } = {}
 
@@ -222,7 +222,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return smallLabel
   }
 
-  _removeSmallRegions(labels: Int32Array<ArrayBuffer>) {
+  _removeSmallRegions(labels: Int32Array) {
     const histogram: { [key: number | string]: number } = {}
 
     for (let offset = 0; offset < labels.length; ++offset) {
@@ -241,7 +241,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     }
   }
 
-  _relabel(labels: Int32Array<ArrayBuffer>) {
+  _relabel(labels: Int32Array) {
     const uniqueArray = []
     for (let i = 0; i < labels.length; ++i) {
       let index = uniqueArray.indexOf(labels[i])
@@ -254,7 +254,7 @@ export default class WatershedSegmentation extends BaseSegmentation {
     return uniqueArray.length
   }
 
-  _encodeLabels(labels: Int32Array<ArrayBuffer>) {
+  _encodeLabels(labels: Int32Array) {
     const imageData = new ImageData(this.imageData.width, this.imageData.height),
       data = imageData.data
     for (let i = 0; i < labels.length; ++i) {

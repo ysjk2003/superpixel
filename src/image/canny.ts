@@ -25,7 +25,7 @@ function createGaussian1D(k: number, sigma: number) {
   return normalize(kernel)
 }
 
-function normalize(array: Float32Array<ArrayBuffer>) {
+function normalize(array: Float32Array) {
   let sum = 0
   for (let i = 0; i < array.length; ++i) sum += array[i]
   for (let i = 0; i < array.length; ++i) array[i] /= sum
@@ -98,7 +98,7 @@ function filter1D(intensity: Edge, kernel: ArrayLike<number>, horizontal: boolea
   return padImage(paddedData, horizontal ? [-size, 0] : [0, -size])
 }
 
-function filter1DTwice(intensity: Edge, kernel: Float32Array<ArrayBuffer>) {
+function filter1DTwice(intensity: Edge, kernel: Float32Array) {
   return filter1D(filter1D(intensity, kernel, true), kernel, false)
 }
 
