@@ -1,15 +1,19 @@
 {
   "name": "superpixel",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "implement superpixel with JS",
   "scripts": {
-    "build": "webpack",
+    "build": "webpack --mode=production && tsc -p tsconfig.types.json",
     "start": "webpack-dev-server --progress"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ysjk2003/superpixel.git"
   },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "keywords": [
     "superpixel",
     "segmentation"

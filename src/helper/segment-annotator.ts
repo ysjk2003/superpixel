@@ -234,12 +234,12 @@ export default class Annotator {
     return data
   }
 
-  show(layer: keyof typeof this.layers) {
+  show(layer: keyof AnnotatorLayers) {
     this.layers[layer].canvas.style.display = "inline-block"
     return this
   }
 
-  hide(layer: keyof typeof this.layers) {
+  hide(layer: keyof AnnotatorLayers) {
     this.layers[layer].canvas.style.display = "none"
     return this
   }
@@ -472,8 +472,8 @@ export default class Annotator {
         (window.pageYOffset || document.documentElement.scrollTop) -
         (document.documentElement.clientTop || 0)
     let x = Math.round(
-        (event.pageX - offsetLeft + container.scrollLeft) * (container.offsetWidth / container.scrollWidth),
-      ),
+      (event.pageX - offsetLeft + container.scrollLeft) * (container.offsetWidth / container.scrollWidth),
+    ),
       y = Math.round(
         (event.pageY - offsetTop + container.scrollTop) * (container.offsetHeight / container.scrollHeight),
       )

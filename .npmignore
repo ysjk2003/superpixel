@@ -1,0 +1,8 @@
+src/
+public/
+node_modules/
+tsconfig.json
+.eslint*
+.prettier*
+*.log
+webpack.config.js
